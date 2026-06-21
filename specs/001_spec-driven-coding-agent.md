@@ -5,7 +5,7 @@ The agent is a coding agent that works with any OpenAI-compatible chat-completio
 ## Behaviour
 
 ### Agent spec (JSON)
-- Recognised top-level fields: `model`, `endpoint`, `status`, `inferred_tool_schema` (OpenAI `tools` array), `behaviour.call_delivery_mode`, `tool_dispatch`, `aliases`, `options`, `provider`, `provider_api_support.streaming.supported`, `max_output_tokens`, `max_input_token_price_per_million`, `max_output_token_price_per_million`, `disabled`, `comment`, `auth`, `key_env`, `keyring_service`, `keyring_username`.
+- Recognised top-level fields: `model`, `endpoint`, `status`, `inferred_tool_schema` (OpenAI `tools` array), `behaviour.call_delivery_mode`, `tool_dispatch`, `aliases`, `options`, `provider`, `provider_api_support.streaming.supported`, `max_output_tokens`, `max_rpm`, `max_input_token_price_per_million`, `max_output_token_price_per_million`, `disabled`, `comment`, `auth`, `key_env`, `keyring_service`, `keyring_username`.
 - `tool_dispatch` maps a model-facing tool name to `{"python_function": <built-in implementation name>, "param_map": {<model arg>: <implementation arg>}}`. Arguments not listed in `param_map` pass through unchanged.
 - A spec is rejected before running if `disabled` is true (error message is `comment`, default "This agent spec is disabled.") or if `inferred_tool_schema` is missing or empty ("No tool schema for '<model>' — probe likely failed.").
 
@@ -56,6 +56,8 @@ The agent is a coding agent that works with any OpenAI-compatible chat-completio
 
 ### Credentials and client
 - `run://` specs use the subprocess backend. `auth: "opencode-github-copilot"` reads `github-copilot.access` from `~/.local/share/opencode/auth.json` and sends it in the `X-API-Key` header.
+- HTTP clients enforce a client-side rate limit per endpoint base URL. All clients for the same base URL share one limit, and the first client created for that URL sets it. The limit is the spec's `max_rpm` (requests per minute) when present, and 40 otherwise. `run://` subprocess backends are not rate-limited.
+- Before each HTTP request attempt (including retries after HTTP 429), if the limit's number of requests has already been made within the last 60 seconds, the agent prints `  [rate-limit] <N> RPM limit reached — waiting <seconds, 1 decimal>s …` and waits until the oldest of those requests is 60 seconds old. Waiting clients are served one at a time.
 - Otherwise the API key comes from, in order: the keyring (`keyring_service`/`keyring_username`), then the environment variable named by `keyring_username` uppercased with `-` replaced by `_`, then the variable named by `key_env`, then `OPENROUTER_API_KEY`.
 
 ### Pricing check
