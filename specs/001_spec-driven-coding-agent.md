@@ -51,6 +51,8 @@ The agent is a coding agent that works with any OpenAI-compatible chat-completio
 - Each session appends JSON Lines records to `~/.local/share/agent_probe/<safe model>/<YYYY-MM-DD>/<HHMMSS>_<session id>.jsonl`. Record types: `session_start`, `session_resumed`, `user`, `usage`, `tool_call`, `tool_result`, `fatal_error`, `error`, `provider_pinned`, `assistant`, `session_end`. Every record has `ts` (ISO seconds) and `cwd`.
 - After a task, the conversation is saved to `~/.local/share/agent_probe/<safe model>/<session id>_messages.json`, but only if it has at least one non-system message. Messages that lack `ts` get one.
 - Resuming by session id loads that snapshot. If none exists for the current model, the most recently modified snapshot with that id under another model is used, with a notice. If no snapshot is found anywhere, a warning is shown and the session starts fresh.
+- The agent shows the user a resume command, i.e. the shell command that continues the current session. By default it is `<program> <model> --session <session id>`, where `<program>` is the name the CLI was invoked as (for the REPL entry point, `agent-probe`).
+- An environment variable that overrides the resume command lets a wrapper script present itself: when it is set and non-empty, the resume command is `<value> --session <session id>`, with no model argument, because the wrapper is assumed to choose the model itself.
 
 ### Credentials and client
 - `run://` specs use the subprocess backend. `auth: "opencode-github-copilot"` reads `github-copilot.access` from `~/.local/share/opencode/auth.json` and sends it in the `X-API-Key` header.
@@ -66,3 +68,4 @@ The agent is a coding agent that works with any OpenAI-compatible chat-completio
 - Inline JSON objects that fail to parse are skipped; scanning resumes at the next `{`.
 - A resumed session keeps the resumed id as its session id; if no snapshot is found, it starts fresh under that id.
 - A fresh session with only the system message leaves no snapshot.
+- If the resume-command override variable is set but empty, the default resume command is used.
