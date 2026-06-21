@@ -13,7 +13,7 @@ The agent is a coding agent that works with any OpenAI-compatible chat-completio
 - If the model argument ends in `.json`, it is read as a spec file path; a relative path is resolved against the installation's project root.
 - Otherwise the spec is looked up in the project root as `agent_spec_<safe>.json`, then `inferred_tool_schema_<safe>.json`, then `tool_schema_<safe>.json`, where `<safe>` is the model name with `/` and `:` replaced by `_`.
 - If none exists, or a re-probe is forced, the model is probed (elicit tool names, build a tool schema, probe twice, summarise behaviour, build a dispatch table) and the result is written to `agent_spec_<safe>.json` with `status: "ok"` and `elicited_names`.
-- `run://<binary path>` as endpoint or model selects a local subprocess backend. If no cached spec exists, a default spec is generated and saved with `status: "default"`, structured tool calls, and four tools: `read_file(path)`, `write_file(path, content)`, `str_replace(path, old_str, new_str)`, `execute_shell_command(command)`.
+- `run://<binary path>` as endpoint or model selects a local subprocess backend. If no cached spec exists, a default spec is generated and saved with `status: "default"`, structured tool calls, and four tools: `read_file(path)`, `write_file(path, content)`, `str_replace(path, old_str, new_str)`, `execute_shell_command(command)`. The default `tool_dispatch` for `str_replace` has `param_map` `{"old_str": "old", "new_str": "new"}`, so the model's `old_str`/`new_str` arguments reach the string-replacement implementation; the other three have an empty `param_map`.
 - Default endpoint: `https://openrouter.ai/api/v1`.
 
 ### Aliases and options
@@ -36,6 +36,7 @@ The agent is a coding agent that works with any OpenAI-compatible chat-completio
   - Otherwise the reply is the final answer and the turn ends.
 - The turn result has the session id, the final reply (the last non-empty assistant content, or none), cumulative usage (`prompt`, `completion`, `total`, `cached`, `cache_write`) and the message list.
 - Token budget: each turn has a budget of 3,000,000 total tokens. When exceeded, a `token_limit` event fires. Interactively, the user is asked whether to double the budget (`y`/`yes` continues). Otherwise the turn stops with no final reply.
+- Built-in file tools (read, write, string replace, update file, list directory, search files given a plain directory path) expand a leading `~` or `~user` in the path argument to the home directory before accessing the filesystem. Result messages still quote the path as the model gave it.
 - A call to a tool with no `tool_dispatch` entry is fatal: the error is logged and the process exits with status 2. An unknown implementation name or bad arguments return an `ERROR: ...` string to the model.
 - Ctrl-C during a turn kills the running tool subprocess (its whole process group) and aborts the turn back to the prompt. At the prompt, Ctrl-C is ignored. A caller can also cancel a turn from another thread; the turn stops at the next model-call boundary.
 
