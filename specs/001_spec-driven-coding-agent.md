@@ -12,7 +12,7 @@ The agent is a coding agent that works with any OpenAI-compatible chat-completio
 ### Loading a spec
 - If the model argument ends in `.json`, it is read as a spec file path; a relative path is resolved against the installation's project root.
 - Otherwise the spec is looked up in the project root as `agent_spec_<safe>.json`, then `inferred_tool_schema_<safe>.json`, then `tool_schema_<safe>.json`, where `<safe>` is the model name with `/` and `:` replaced by `_`.
-- If none exists, or a re-probe is forced, the model is probed (elicit tool names, build a tool schema, probe twice, summarise behaviour, build a dispatch table) and the result is written to `agent_spec_<safe>.json` with `status: "ok"` and `elicited_names`.
+- The agent never probes a model itself. If no spec file exists (or a re-probe is forced, which skips the cached files), it fails with an invalid-spec error: "No agent spec found for '<model>'. Run `llmprobe <model>` (with --endpoint <endpoint> if needed) to probe the model and generate a spec file." No spec file is written.
 - `run://<binary path>` as endpoint or model selects a local subprocess backend. If no cached spec exists, a default spec is generated and saved with `status: "default"`, structured tool calls, and four tools: `read_file(path)`, `write_file(path, content)`, `str_replace(path, old_str, new_str)`, `execute_shell_command(command)`. The default `tool_dispatch` for `str_replace` has `param_map` `{"old_str": "old", "new_str": "new"}`, so the model's `old_str`/`new_str` arguments reach the string-replacement implementation; the other three have an empty `param_map`.
 - Default endpoint: `https://openrouter.ai/api/v1`.
 
