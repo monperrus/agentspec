@@ -30,10 +30,19 @@ In the interactive REPL and the interactive CLI loop, a line that starts with `/
   - the number of non-system messages, as `messages: <n> (excl. system)`.
   - Numbers use thousands separators.
 
+## Model-callable slash command tool
+- The built-in commands can also be offered to the model as one ready-made tool named `slash_command`. An agent opts in by adding it to its tool list, and it is dispatched like any other tool.
+- Tool description given to the model: `Run a slash command. command: one of clear, model, usage, help. For 'model', pass a model-id in args to switch; omit args to list.`
+- Parameters: `command` (required string, enum `clear`, `model`, `usage`, `help`, description `Slash command to run.`) and `args` (optional string, default empty, description `Optional argument (e.g. model-id for 'model').`).
+- Before the tool is used, the agent binds it to the live session, the model client and the current model name. It usually does this right after creating the session.
+- A call runs the same built-in behaviour as the matching REPL command, with `args` as the argument string, on the bound session. For example, `clear` resets the bound session's history and usage totals, and `model` with an id switches the bound session's model.
+- The tool result is the text the command would have printed, with leading and trailing whitespace removed. It is not printed to the console. The structured result carries the same text in a `result` field.
+
 ## Edge cases
 - If no endpoint can be determined, `/model` prints `Cannot determine endpoint URL to query /models.`
 - For a `run://` subprocess backend, `/model` with no argument prints `/models is not available for subprocess backends.` and sends no request.
 - If fetching the model list fails, `/model` prints `Failed to fetch models from endpoint: <message>` and then `The endpoint may not support GET /models.` If the list is empty, it prints `No models returned by the endpoint.`
 - `/model <id>` does not check whether the model exists and does not reload the agent spec. The session keeps its tool schema and dispatch table.
 - The cached percentage is 0 when there are no prompt tokens.
+- If the tool gets a `command` outside the four built-ins, it runs nothing and returns `ERROR: unknown command '<command>'. Valid: clear, model, usage, help`. Commands registered by a caller are not reachable through the tool.
 - A line such as `/tmp/file` counts as a slash command (the unknown command `tmp/file`), so it never reaches the model.
