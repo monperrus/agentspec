@@ -9,12 +9,13 @@ The implementation registry offers two more built-in implementations that let a 
   - Runs the command string through the system shell in a new process group/session. Stdout and stderr go to the capture files `<capture dir>/<id>.stdout` and `<id>.stderr`. `<id>` is a new random 12-character lowercase hex execution id.
   - The process's stdin is a named FIFO created at `<capture dir>/<id>.stdin`. Bytes written to that path by anyone (the write-file tool, a shell redirect such as `echo yes > <path>`) are delivered to the running process's stdin.
   - The capture directory and its parents are created if missing. Capture files and FIFOs are never deleted.
-  - Waits at most 100 ms for the command to exit, then returns a JSON object with `tool_exec_id`, `stdin_localfile`, `stdout_localfile` and `stderr_localfile` (absolute paths).
+  - Waits at most 100 ms for the command to exit, then returns a JSON object with `tool_exec_id`, `started_at`, `stdin_localfile`, `stdout_localfile` and `stderr_localfile` (absolute paths).
+  - `started_at` is the local wall-clock time of the spawn, formatted `YYYY-MM-DDTHH:MM:SS` (ISO 8601, second precision, no fractional seconds and no timezone offset).
   - If the command exited within that window, the object also has `completed: true`, `returncode` and `duration_time` (seconds since start, rounded to 3 decimals). It then also has `stdout` and/or `stderr`, each included only if that capture file is at most 4096 bytes.
-  - Otherwise, the command keeps running in the background and the object has only the four path/id fields above.
+  - Otherwise, the command keeps running in the background and the object has only the id, `started_at` and path fields above.
   - When such a background command later exits, a completion event is published to a process-wide completion queue that any caller can consume. The event holds `tool_exec_id`, `returncode`, the stdout and stderr capture paths, and the duration in seconds (rounded to 3 decimals). A command that completed within the 100 ms window publishes no event, because its result was already returned inline.
 - Poll (`t_query_exec`, argument `tool_exec_id`):
-  - Returns a JSON object with `completed` (boolean), `duration_time` (seconds since start, rounded to 3 decimals), `stdin_localfile` (the FIFO path), `stdout_localfile_size` and `stderr_localfile_localsize` (current capture file sizes in bytes; the field names are exactly these).
+  - Returns a JSON object with `completed` (boolean), `started_at` (the same value the start result returned), `duration_time` (seconds since start, rounded to 3 decimals), `stdin_localfile` (the FIFO path), `stdout_localfile_size` and `stderr_localfile_localsize` (current capture file sizes in bytes; the field names are exactly these).
   - When completed, it also has `returncode` and, under the same 4096-byte rule for each stream, `stdout` and/or `stderr`.
 - Each implementation returns its text result together with metadata `{"result": <same text>}`.
 - The asynchronous coding agent:
