@@ -21,6 +21,7 @@ In the interactive REPL and the interactive CLI loop, a line that starts with `/
   - The response is either a JSON list of model objects or an object whose `data` field holds that list.
   - The output is `Available models (<n>):`, then one line per model showing its `id`, else its `name`, else the whole object. The current model is marked with `*`. The last line is `To switch: /model <model-id>`.
 - `/usage` prints `Session token usage:` followed by:
+  - the session's trajectory identifier, as `  trajectory: <id>` (`unknown` if the session has none);
   - the prompt token count;
   - the cached token count and its percentage of prompt tokens (only if non-zero);
   - the cache-write token count (only if non-zero);
