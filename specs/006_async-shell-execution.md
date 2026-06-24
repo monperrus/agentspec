@@ -15,8 +15,8 @@ The implementation registry offers two more built-in implementations that let a 
   - Otherwise, the command keeps running in the background and the object has only the id, `started_at` and path fields above.
   - When such a background command later exits, a completion event is published to a process-wide completion queue that any caller can consume. The event holds `tool_exec_id`, `returncode`, the stdout and stderr capture paths, and the duration in seconds (rounded to 3 decimals). A command that completed within the 100 ms window publishes no event, because its result was already returned inline.
 - Poll (`t_query_exec`, argument `tool_exec_id`):
-  - Returns a JSON object with `completed` (boolean), `started_at` (the same value the start result returned), `duration_time` (seconds since start, rounded to 3 decimals), `stdin_localfile` (the FIFO path), `stdout_localfile_size` and `stderr_localfile_localsize` (current capture file sizes in bytes; the field names are exactly these).
-  - When completed, it also has `returncode` and, under the same 4096-byte rule for each stream, `stdout` and/or `stderr`.
+  - Returns a JSON object with `completed` (boolean), `returncode` (always present: `null` while the command is running, the integer exit status once completed), `started_at` (the same value the start result returned), `duration_time` (seconds since start, rounded to 3 decimals), `stdin_localfile` (the FIFO path), `stdout_localfile_size` and `stderr_localfile_localsize` (current capture file sizes in bytes; the field names are exactly these).
+  - When completed, it also has, under the same 4096-byte rule for each stream, `stdout` and/or `stderr`.
 - Each implementation returns its text result together with metadata `{"result": <same text>}`.
 - The asynchronous coding agent:
   - Is invoked as `<agent> MODEL [TASK...] [--endpoint URL] [--session SESSION_ID]`. MODEL is a model id or a `run://` URI. The endpoint defaults to the standard default endpoint. `--session` resumes that session.
