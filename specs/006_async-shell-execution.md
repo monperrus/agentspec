@@ -19,7 +19,7 @@ The implementation registry offers two more built-in implementations that let a 
   - Returns a JSON object with `completed` (boolean), `returncode` (always present: `null` while the command is running, the integer exit status once completed), `started_at` (the same value the start result returned), `cwd` (the same working directory the start result returned), `duration_time` (seconds since start, rounded to 3 decimals), `stdin_localfile` (the FIFO path), `stdout_localfile_size` and `stderr_localfile_localsize` (current capture file sizes in bytes; the field names are exactly these).
   - When completed, it also has, under the same 4096-byte rule for each stream, `stdout` and/or `stderr`.
 - Each implementation returns its text result together with metadata `{"result": <same text>}`.
-- When a `read_file` tool call's `path` is exactly the capture file path of a command started in the current process, the displayed tool result is prefixed with a yellow line `  shell output from: <command>` (the label bold), followed by the usual dimmed result display. The result sent to the model and written to the session log is unchanged.
+- When a `read_file` tool call's `path`, after expanding a leading `~` to the home directory, is exactly the stdout or stderr capture file path of a command started in the current process, the displayed tool result is prefixed with a yellow line `  shell output from: <command>` (the label bold), followed by the usual dimmed result display. The result sent to the model and written to the session log is unchanged.
 - The asynchronous coding agent:
   - Is invoked as `<agent> MODEL [TASK...] [--endpoint URL] [--session SESSION_ID]`. MODEL is a model id or a `run://` URI. The endpoint defaults to the standard default endpoint. `--session` resumes that session.
   - With TASK words it runs the standard one-shot task mode on the words joined by spaces and exits, printing that mode's standard startup lines. Both modes get the `--session` value and the system prompt supplement below.
@@ -39,7 +39,7 @@ The implementation registry offers two more built-in implementations that let a 
 - Output inlining is decided per stream: a small stdout is inlined even when stderr is too big, and vice versa. A stream whose capture file cannot be read is omitted.
 - Polling an id that was not started in the current process returns `{"error": "unknown tool_exec_id: <id>"}`. Execution ids do not survive a process restart, even though their capture files stay on disk.
 - A missing capture file is reported with size 0.
-- A `read_file` path that is not a capture path of a known execution (another file, a relative spelling of the path, or an execution from an earlier process) gets no `shell output from:` line.
+- A `read_file` path that is not a capture path of a known execution (another file, the stdin FIFO path, a relative spelling of the path, or an execution from an earlier process) gets no `shell output from:` line.
 - A delayed start runs the command only after the full wait, and the call does not return during the wait. The 100 ms inline window and `duration_time` count from the actual spawn, not from the call. A delayed command still running 100 ms after spawn returns only its id and capture paths, and must be polled.
 - The former implementation name `t_plan_delay` and tool `plan_shell_command` no longer exist; an agent spec that names `t_plan_delay` in `tool_dispatch` refers to an unknown implementation.
 - Start and poll never wait for or kill a long-running command. It keeps running until it exits by itself.
