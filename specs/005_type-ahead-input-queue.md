@@ -18,3 +18,5 @@ In the interactive REPL and the interactive CLI loop, the user can keep typing w
 - Slash commands queued during a turn run before any instruction queued in the same batch, because the whole batch is scanned (running slash commands) before any queued instruction runs.
 - End of input on standard input stops the background reading for that turn. Nothing else is queued.
 - Background reading stops when the turn ends. A line typed after that point is read by the normal prompt, not the queue.
+- When a tool reads an answer from the user on standard input during a turn (for example `ask_user_question`), background reading pauses before the answer prompt appears. It resumes once the answer is read, whether reading succeeds, hits end of input, or is interrupted. Every keystroke of the answer goes to the tool. None of it is queued or lost to the background reader.
+- Outside a queued-input turn (no background reader active), such a tool reads standard input directly with nothing to pause.
