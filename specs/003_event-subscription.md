@@ -20,6 +20,7 @@ A caller embedding the agent as a library can subscribe handlers to individual e
   - The `session_usage` display line appends `  |  effective <n>` (with `n = max(0, prompt - cached) + completion`) after the total, only when the session has cached tokens.
   - `session_resumed` (history loaded, or not found): `session_id`, `messages_loaded`, and optionally `source_model`.
   - `provider_pinned` (OpenRouter provider locked for the session): `provider`.
+  - `compaction` (older context replaced by a summary): `summary`, `compacted_turns`.
 
 ## Edge cases
 - Emitting an event type with no subscribed handlers is not an error; only the generic handler runs.
