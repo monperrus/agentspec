@@ -60,6 +60,13 @@ The agent is a coding agent that works with any OpenAI-compatible chat-completio
 - After a task, the conversation is saved to `~/.local/share/agent_probe/<safe model>/<session id>_messages.json`, but only if it has at least one non-system message. Messages that lack `ts` get one. The model directory is created if missing.
 - The snapshot file is a JSON object (UTF-8, 2-space indent) with two keys: `metadata`, an object with `endpoint` (the endpoint base URL, or `""` if unknown), `model` (the model name as given, not the safe name) and `session_id`; and `messages`, the array of messages.
 - Resuming by session id loads that snapshot. If none exists for the current model, the most recently modified snapshot with that id under another model is used, with a notice. If no snapshot is found anywhere, a warning is shown and the session starts fresh.
+- A snapshot loaded by exact id (for the current model or from another model) is flattened to plain text before it is resumed, because some providers reject tool call ids from an earlier session. In order:
+  1. Consecutive user messages are merged into one.
+  2. An assistant message with tool calls is replaced by one assistant message per call, in call order, with content `[Tool call: <name>(<arguments>)]`, where `<arguments>` is the raw arguments string. Its own text content is dropped.
+  3. A `tool` message becomes an assistant message with content `[Tool result: <content>]`.
+  4. Consecutive assistant messages are merged into one.
+  
+  Merging joins the contents with a blank line (`\n\n`); if the earlier content is empty, the later content is used alone. The merged message takes the later message's `ts`. Converted messages keep the `ts` of the message they came from. The resumed history therefore has no tool calls and no `tool` messages.
 - A session can also be resumed by a short id of the form `<prefix>-<8 chars>` (any id whose last `-`-separated part is 8 characters long). When no snapshot file matches the id exactly, the short id matches a snapshot whose real session id hashes, as the first 8 lowercase hex digits of SHA-256 over its UTF-8 bytes, to that last part. The prefix is ignored. The current model's snapshots are searched first. Other models' snapshots are searched only when no other model has a snapshot with that exact id.
 - The agent shows the user a resume command, i.e. the shell command that continues the current session. By default it is `<program> <model> --session <session id>`, where `<program>` is the name the CLI was invoked as (for the REPL entry point, `agent-probe`).
 - An environment variable that overrides the resume command lets a wrapper script present itself: when it is set and non-empty, the resume command is `<value> --session <session id>`, with no model argument, because the wrapper is assumed to choose the model itself.
@@ -82,7 +89,7 @@ The agent is a coding agent that works with any OpenAI-compatible chat-completio
 - A resumed session keeps the resumed id as its session id; if no snapshot is found, it starts fresh under that id.
 - A fresh session with only the system message leaves no snapshot.
 - Two tasks in a row with no assistant reply between them (for example, the first turn hit an API error) produce one user message, not two consecutive user messages. A conversation that ends in an assistant or tool message gets a new user message as usual.
-- Loading a snapshot (exact id, short id, or from another model) accepts both formats: an object with a `messages` key yields that array, and a legacy snapshot that is a plain JSON array of messages is used as is.
+- Loading a snapshot (exact id, short id, or from another model) accepts both formats: an object with a `messages` key yields that array, and a legacy snapshot that is a plain JSON array of messages is used as is. A snapshot whose messages are not an array counts as not found.
 - A generated default spec is cached: the next load for the same model finds and reuses it instead of generating again, unless a re-probe is forced.
 - An exact snapshot id match always takes precedence over short-id resolution. An id with no `-`, or whose last part is not 8 characters long, is never treated as a short id.
 - A `display_name` that is present is used verbatim in the banner, even when it is empty; the model name is not appended.
