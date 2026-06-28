@@ -1,6 +1,6 @@
 # Declarative tool definitions
 
-A library caller can declare a custom tool once (model-facing name, description, implementation, optional parameter schema, optional argument-name mapping) and obtain from a list of such declarations both the OpenAI-compatible `tools` array and the matching `tool_dispatch` table. These can replace the built-in tool set by being placed in an agent spec as `inferred_tool_schema` and `tool_dispatch`.
+A library caller can declare a custom tool once (model-facing name, description, implementation, optional parameter schema, optional argument-name mapping) and obtain from a list of such declarations both the OpenAI-compatible `tools` array and the matching `tool_dispatch` table. These can replace the built-in tool set by being placed in an agent spec as `tool_specs` (or its legacy name `inferred_tool_schema`) and `tool_dispatch`.
 
 ## Behaviour
 - A tool declaration has: a model-facing name, a description, an implementation, an optional parameter schema (a JSON Schema object) and an optional argument-name mapping (model argument name → implementation argument name).
