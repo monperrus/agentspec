@@ -33,12 +33,16 @@ Long sessions compact automatically. When a model call reports that its prompt r
   ```
 - The summary is the reply content with leading and trailing whitespace removed. On success, the conversation becomes: the system messages from the prefix, then one summary message, then the suffix. The summary message has `role` `assistant`, `content` set to the summary, `compacted_summary: true`, and `ts`, an ISO-8601 timestamp in seconds.
 - After a successful compaction the agent:
-  - emits a `compaction` event with `summary`, `compacted_turns` (the number of non-system messages in the prefix) and `fmt` (a dim line `[compaction] <n> turns summarized (<chars> chars)`);
-  - appends a `compaction` record to the session trace with `compacted_turns`, `summary_length` (characters), `summary` and `ts`;
+  - emits a `compaction` event with `summary`, `compacted_turns` (the number of non-system messages in the prefix) and `fmt` (a dim line `[compaction] <n> turns summarized (<chars> chars)`, followed by two spaces and a highlighted `ratio <r>x`, with r to 1 decimal place);
+  - appends a `compaction` record to the session trace with `compacted_turns`, `summary_length` (characters), `compaction_ratio` (the ratio rounded to 2 decimal places), `summary` and `ts`;
   - saves the session's message snapshot, so a resumed session starts from the compacted history.
+- Compaction ratio = total characters of the `content` of the prefix's non-system messages ÷ characters of the summary. A message with no content counts as 0 characters.
+- Compaction progress: the display line of each per-response `usage` event (`[tokens] …`) includes `compact <p>%`, where p = prompt tokens ÷ the session's `compaction_trigger_tokens` × 100, rounded to a whole number. The parts are separated by `  |  `, and this part sits after the optional cache-write part and before `completion <n>`. It is shown whether or not compaction is enabled. The event's data fields do not change.
 
 ## Edge cases
 - Compaction disabled → no summary call, whatever the token count.
+- `compaction_trigger_tokens` of 0 → the `compact <p>%` part is omitted from the usage line.
+- Progress can exceed 100%, for example `compact 104%` on the call that triggers compaction.
 - Prompt tokens exactly equal to the threshold trigger compaction. One token below does not.
 - If the conversation has K or fewer non-system messages, nothing is compacted and no summary call is made.
 - If the summary call fails, the agent emits an `error` event with text `Compaction failed: <error>` and appends a `compaction_error` trace record with `error` and `ts`. The conversation stays unchanged and the turn continues.
