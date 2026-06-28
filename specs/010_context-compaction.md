@@ -8,7 +8,9 @@ Long sessions compact automatically. When a model call reports that its prompt r
   - `compaction_trigger_tokens` (default `100000`): the prompt-token threshold.
   - `compaction_target_tokens` (default `20000`): the output-token limit (`max_tokens`) for the summary call.
   - `compaction_keep_last_turns` (default `2`): how many of the most recent non-system messages stay unchanged.
-- Triggering relies only on usage metadata from the server. The agent never counts tokens locally. After each main model call's usage has been recorded, compaction runs when it is enabled and the response's `usage.prompt_tokens` is ≥ `compaction_trigger_tokens`. A missing value counts as 0. This check comes before the session token-budget check.
+- Triggering relies only on usage metadata from the server. The agent never counts tokens locally. After each main model call's usage has been recorded, compaction runs when it is enabled and the response's `usage.prompt_tokens` is ≥ `compaction_trigger_tokens` and also > W + H (see hysteresis below). A missing value counts as 0. This check comes before the session token-budget check.
+- Hysteresis: the session keeps a watermark W, which starts at 0. Each time compaction is attempted, W becomes the prompt-token count that triggered the attempt, which is the count before compaction. H = `compaction_trigger_tokens` ÷ 4, rounded down. Compaction can therefore fire again only once the prompt count has grown by more than a quarter of the threshold past the last triggering count. This stops a "compaction storm": the remaining context (system, summary and kept messages) can still sit at or above the threshold, and without the watermark every following turn would compact again.
+- `/clear` resets W to 0.
 - Split: the kept suffix begins at the K-th most recent non-system message, where K = `compaction_keep_last_turns`, and runs to the end. The prefix is every message before that point. When K = 0, the suffix is empty and the prefix is the whole conversation.
 - The summary call is a separate chat completion to the session's model with `temperature` 0 and `max_tokens` = `compaction_target_tokens`. Its messages are the prefix, as-is, followed by one `user` message with exactly this text:
   ```
@@ -43,7 +45,9 @@ Long sessions compact automatically. When a model call reports that its prompt r
 - Compaction disabled → no summary call, whatever the token count.
 - `compaction_trigger_tokens` of 0 → the `compact <p>%` part is omitted from the usage line.
 - Progress can exceed 100%, for example `compact 104%` on the call that triggers compaction.
-- Prompt tokens exactly equal to the threshold trigger compaction. One token below does not.
+- Prompt tokens exactly equal to the threshold trigger compaction (when W + H is below the threshold, as it is at the start). One token below does not.
+- With the default threshold of 100000: after a compaction triggered at 100000, later calls reporting 100000 or 100001 do not compact. Only a call reporting more than 125000 compacts again.
+- W is updated whenever an attempt is made, even if the attempt compacts nothing (too few messages), fails, or produces an empty summary.
 - If the conversation has K or fewer non-system messages, nothing is compacted and no summary call is made.
 - If the summary call fails, the agent emits an `error` event with text `Compaction failed: <error>` and appends a `compaction_error` trace record with `error` and `ts`. The conversation stays unchanged and the turn continues.
 - If the summary is empty or whitespace-only, the conversation stays unchanged and no event is emitted.

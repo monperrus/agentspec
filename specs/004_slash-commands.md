@@ -13,7 +13,7 @@ In the interactive REPL and the interactive CLI loop, a line that starts with `/
   - `model`: "List available models or switch: /model <model-id>."
   - `usage`: "Show token usage for the current session."
   - `help`: "Show this help message."
-- `/clear` removes every message except the system messages. If there are none, it keeps only the first message. It also sets the cumulative usage totals (`prompt`, `completion`, `total`, `cached`, `cache_write`) to 0 and prints `Context cleared. Session history has been reset.`
+- `/clear` removes every message except the system messages. If there are none, it keeps only the first message. It also sets the cumulative usage totals (`prompt`, `completion`, `total`, `cached`, `cache_write`) to 0, resets the compaction watermark (see context compaction) so a new growth cycle can trigger compaction, and prints `Context cleared. Session history has been reset.`
 - `/model <id>` sets the session model to `<id>`, taken verbatim with surrounding whitespace trimmed. It prints `Model switched from <old> → <new>` and `The next turn will use the new model.` Every later turn in that session calls the new model.
 - `/model` with no argument lists the models the endpoint offers:
   - The endpoint is the spec's `endpoint`, or the client's base URL if the spec has none.
