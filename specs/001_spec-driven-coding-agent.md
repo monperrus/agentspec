@@ -5,7 +5,7 @@ The agent is a coding agent that works with any OpenAI-compatible chat-completio
 ## Behaviour
 
 ### Agent spec (JSON)
-- Recognised top-level fields: `model`, `endpoint`, `status`, `tool_specs` (OpenAI `tools` array; legacy name `inferred_tool_schema`), `tools` (implementation names paired with `tool_specs`), `behaviour.call_delivery_mode`, `tool_dispatch` (legacy explicit dispatch), `aliases`, `options`, `provider`, `provider_api_support.streaming.supported`, `max_output_tokens`, `max_rpm`, `max_input_token_price_per_million`, `max_output_token_price_per_million`, `disabled`, `comment`, `auth`, `key_env`, `keyring_service`, `keyring_username`.
+- Recognised top-level fields: `model`, `endpoint`, `status`, `tool_specs` (OpenAI `tools` array; legacy name `inferred_tool_schema`), `tools` (implementation names paired with `tool_specs`), `behaviour.call_delivery_mode`, `tool_dispatch` (legacy explicit dispatch), `aliases`, `options`, `provider`, `provider_api_support.streaming.supported`, `max_output_tokens`, `max_rpm`, `max_input_token_price_per_million`, `max_output_token_price_per_million`, `disabled`, `comment`, `display_name`, `auth`, `key_env`, `keyring_service`, `keyring_username`.
 - `tool_dispatch` maps a model-facing tool name to `{"python_function": <built-in implementation name>, "param_map": {<model arg>: <implementation arg>}}`. Arguments not listed in `param_map` pass through unchanged.
 - A spec is rejected before running if `disabled` is true (error message is `comment`, default "This agent spec is disabled.") or if the tool definitions (`tool_specs`, else `inferred_tool_schema`) are missing or empty ("No tool schema for '<model>' — probe likely failed.").
 
@@ -42,6 +42,7 @@ The agent is a coding agent that works with any OpenAI-compatible chat-completio
 - A call to a tool with no `tool_dispatch` entry is fatal: the error is logged and the process exits with status 2. An unknown implementation name or bad arguments return an `ERROR: ...` string to the model.
 - If a model call fails (network, HTTP or API error), the turn does not crash. An `error` event fires with text `API error: <message>`, an `error` log record is written with field `error` holding the same text, and the turn ends at once with the result so far (no final reply unless one was already produced).
 - In the REPL and in the interactive CLI loop, any other unexpected error during a turn fires an `error` event with the error message and writes an `error` log record. The loop then continues to the next prompt, and the conversation snapshot is still saved.
+- On start, both the sync and the async REPL print a bold banner followed by `  (type 'exit' to quit)` and a blank line. The banner text is the spec's `display_name` when that field is present, and otherwise the agent's program name, a space, and the model name.
 - Ctrl-C during a turn kills the running tool subprocess (its whole process group) and aborts the turn back to the prompt. At the prompt, Ctrl-C is ignored. A caller can also cancel a turn from another thread; the turn stops at the next model-call boundary.
 
 ### Events
@@ -74,4 +75,5 @@ The agent is a coding agent that works with any OpenAI-compatible chat-completio
 - A fresh session with only the system message leaves no snapshot.
 - A generated default spec is cached: the next load for the same model finds and reuses it instead of generating again, unless a re-probe is forced.
 - An exact snapshot id match always takes precedence over short-id resolution. An id with no `-`, or whose last part is not 8 characters long, is never treated as a short id.
+- A `display_name` that is present is used verbatim in the banner, even when it is empty; the model name is not appended.
 - If the resume-command override variable is set but empty, the default resume command is used.
