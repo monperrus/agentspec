@@ -44,6 +44,10 @@ The agent is a coding agent that works with any OpenAI-compatible chat-completio
   - The partial output is the captured stdout, followed by the captured stderr when stderr is non-empty. The two are separated by a newline only when stdout is non-empty. With no output at all, this part is empty.
   - The hint is `The command did not finish within 60 seconds. For long-running commands, use 'nohup <command> &' to run in the background.`. If the current agent spec's `tool_dispatch` maps any tool to the implementation `t_execute_async`, the hint continues with ` Or use t_execute_async to start the command asynchronously.`. Otherwise the asynchronous implementation is not mentioned.
   - The metadata has `error` and `result` (both the full returned text), plus `stdout`, `stderr` and `hint` (each as a separate field).
+- The built-in search tool (arguments: a `path`, default `.`, and a `pattern`) runs a line-numbered grep over the path, with a 30-second limit. It returns compact JSON with no whitespace between tokens (separators `,` and `:`):
+  - On success: `{"matches":[{"file":<string>,"line":<integer>,"text":<string>},...]}`, one entry per grep output line of the form `file:line:text`, in grep's output order. The line is split on the first two `:` only, so `text` may itself contain `:`. With no matches the result is `{"matches":[]}`.
+  - On timeout, the search's whole process group is killed and the result is `{"error":"search timed out after 30 s"}`. On any other failure it is `{"error":"<message>"}`.
+  - The metadata has `result` (the returned JSON text), plus `matches` (the match list) on success or `error` (the message) on failure.
 - A call to a tool with no `tool_dispatch` entry is fatal: the error is logged and the process exits with status 2. An unknown implementation name or bad arguments return an `ERROR: ...` string to the model.
 - If a model call fails (network, HTTP or API error), the turn does not crash. An `error` event fires with text `API error: <message>`, an `error` log record is written with field `error` holding the same text, and the turn ends at once with the result so far (no final reply unless one was already produced).
 - In the REPL and in the interactive CLI loop, any other unexpected error during a turn fires an `error` event with the error message and writes an `error` log record. The loop then continues to the next prompt, and the conversation snapshot is still saved.
@@ -95,3 +99,4 @@ The agent is a coding agent that works with any OpenAI-compatible chat-completio
 - A `display_name` that is present is used verbatim in the banner, even when it is empty; the model name is not appended.
 - The startup tools line prefers `inferred_tool_schema` over `tool_specs`, the reverse of the order used when validating the spec.
 - If the resume-command override variable is set but empty, the default resume command is used.
+- Search output lines with fewer than two `:` separators, or whose second field is not an integer line number, are silently left out of `matches`.
