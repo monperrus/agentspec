@@ -43,6 +43,7 @@ The agent is a coding agent that works with any OpenAI-compatible chat-completio
 - If a model call fails (network, HTTP or API error), the turn does not crash. An `error` event fires with text `API error: <message>`, an `error` log record is written with field `error` holding the same text, and the turn ends at once with the result so far (no final reply unless one was already produced).
 - In the REPL and in the interactive CLI loop, any other unexpected error during a turn fires an `error` event with the error message and writes an `error` log record. The loop then continues to the next prompt, and the conversation snapshot is still saved.
 - On start, both the sync and the async REPL print a bold banner followed by `  (type 'exit' to quit)` and a blank line. The banner text is the spec's `display_name` when that field is present, and otherwise the agent's program name, a space, and the model name.
+- On REPL start, before any resumed history is replayed, the REPL prints `Tools:    ` (label plus four spaces) followed by the model-facing tool names joined by `, `, in definition order. The names come from `inferred_tool_schema` when it is non-empty, and otherwise from `tool_specs`. A tool definition without a `function.name` is shown as `?`. With no tool definitions the line is `Tools:    (none)`.
 - Ctrl-C during a turn kills the running tool subprocess (its whole process group) and aborts the turn back to the prompt. At the prompt, Ctrl-C is ignored. A caller can also cancel a turn from another thread; the turn stops at the next model-call boundary.
 
 ### Events
@@ -76,4 +77,5 @@ The agent is a coding agent that works with any OpenAI-compatible chat-completio
 - A generated default spec is cached: the next load for the same model finds and reuses it instead of generating again, unless a re-probe is forced.
 - An exact snapshot id match always takes precedence over short-id resolution. An id with no `-`, or whose last part is not 8 characters long, is never treated as a short id.
 - A `display_name` that is present is used verbatim in the banner, even when it is empty; the model name is not appended.
+- The startup tools line prefers `inferred_tool_schema` over `tool_specs`, the reverse of the order used when validating the spec.
 - If the resume-command override variable is set but empty, the default resume command is used.
