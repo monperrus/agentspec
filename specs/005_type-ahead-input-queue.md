@@ -1,8 +1,11 @@
 # Type-ahead input queue
 
-In the interactive REPL and the interactive CLI loop, the user can keep typing while a turn is running (for example while tools execute). Lines entered during a turn are queued and handled after the turn finishes, as slash commands or as follow-on turns.
+A library caller can start an asynchronous variant of the interactive REPL in which the user can keep typing while a turn is running (for example while tools execute). Lines entered during a turn are queued and handled after the turn finishes, as slash commands or as follow-on turns. The default REPL and the interactive CLI loop are synchronous and do not queue type-ahead input.
 
 ## Behaviour
+- Two REPL variants are available to library callers, taking the same options (non-interactive mode, session to resume, cache key, system-prompt supplement, output-token cap, event callback) and sharing the same setup and teardown: validation, client and session creation, history display when resuming, per-directory prompt history, the banner, exit words, slash-command interception, snapshot saving, the `session_end` log record and the resume hint.
+- The synchronous variant (the default, and the one the interactive CLI loop uses) runs each turn with no background reader. Nothing typed during a turn is queued; it is read by the next normal prompt. Tools that read an answer from standard input work without racing a background reader.
+- The asynchronous variant behaves as described in the rest of this spec.
 - While a turn runs, the agent keeps reading lines from standard input in the background without blocking the turn.
 - After standard input has been idle for 0.5 s during a turn, a dim `> ` prompt is printed with no leading newline, so the user knows input is accepted. It is printed at most once per idle period. After a line is read, it shows again once input has been idle for another 0.5 s.
 - Each non-blank line read during a turn is queued, and the agent prints a dim confirmation `[queued — will run after current turn]` on its own line. The confirmation starts with a carriage return so it overwrites the `> ` prompt. Blank or whitespace-only lines are ignored and not confirmed.
@@ -19,4 +22,4 @@ In the interactive REPL and the interactive CLI loop, the user can keep typing w
 - End of input on standard input stops the background reading for that turn. Nothing else is queued.
 - Background reading stops when the turn ends. A line typed after that point is read by the normal prompt, not the queue.
 - When a tool reads an answer from the user on standard input during a turn (for example `ask_user_question`), background reading pauses before the answer prompt appears. It resumes once the answer is read, whether reading succeeds, hits end of input, or is interrupted. Every keystroke of the answer goes to the tool. None of it is queued or lost to the background reader.
-- Outside a queued-input turn (no background reader active), such a tool reads standard input directly with nothing to pause.
+- In the synchronous variant, or outside a queued-input turn (no background reader active), such a tool reads standard input directly with nothing to pause.
