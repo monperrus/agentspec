@@ -51,6 +51,7 @@ The agent is a coding agent that works with any OpenAI-compatible chat-completio
 - Each session appends JSON Lines records to `~/.local/share/agent_probe/<safe model>/<YYYY-MM-DD>/<HHMMSS>_<session id>.jsonl`. Record types: `session_start`, `session_resumed`, `user`, `usage`, `tool_call`, `tool_result`, `fatal_error`, `error`, `provider_pinned`, `assistant`, `session_end`. Every record has `ts` (ISO seconds) and `cwd`. A `tool_result` record has the tool `name`, the name of the implementation that handled it, and `result`, the full result text returned to the model.
 - After a task, the conversation is saved to `~/.local/share/agent_probe/<safe model>/<session id>_messages.json`, but only if it has at least one non-system message. Messages that lack `ts` get one.
 - Resuming by session id loads that snapshot. If none exists for the current model, the most recently modified snapshot with that id under another model is used, with a notice. If no snapshot is found anywhere, a warning is shown and the session starts fresh.
+- A session can also be resumed by a short id of the form `<prefix>-<8 chars>` (any id whose last `-`-separated part is 8 characters long). When no snapshot file matches the id exactly, the short id matches a snapshot whose real session id hashes, as the first 8 lowercase hex digits of SHA-256 over its UTF-8 bytes, to that last part. The prefix is ignored. The current model's snapshots are searched first. Other models' snapshots are searched only when no other model has a snapshot with that exact id.
 - The agent shows the user a resume command, i.e. the shell command that continues the current session. By default it is `<program> <model> --session <session id>`, where `<program>` is the name the CLI was invoked as (for the REPL entry point, `agent-probe`).
 - An environment variable that overrides the resume command lets a wrapper script present itself: when it is set and non-empty, the resume command is `<value> --session <session id>`, with no model argument, because the wrapper is assumed to choose the model itself.
 
@@ -70,4 +71,5 @@ The agent is a coding agent that works with any OpenAI-compatible chat-completio
 - Inline JSON objects that fail to parse are skipped; scanning resumes at the next `{`.
 - A resumed session keeps the resumed id as its session id; if no snapshot is found, it starts fresh under that id.
 - A fresh session with only the system message leaves no snapshot.
+- An exact snapshot id match always takes precedence over short-id resolution. An id with no `-`, or whose last part is not 8 characters long, is never treated as a short id.
 - If the resume-command override variable is set but empty, the default resume command is used.
