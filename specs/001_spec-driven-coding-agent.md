@@ -94,7 +94,7 @@ The agent is a coding agent that works with any OpenAI-compatible chat-completio
 - `run://` and other endpoints show "no price check". If the price fetch fails, a warning is shown and the run proceeds.
 
 ## Edge cases
-- A tool call whose arguments are not valid JSON is dispatched with empty arguments rather than failing.
+- A tool call whose arguments are not valid JSON, or are valid JSON but not an object (for example an array, string, number or `null`), is dispatched with empty arguments rather than failing. The same rule applies when a resumed session's history is replayed: such a call is displayed with empty arguments.
 - Inline JSON objects that fail to parse are skipped; scanning resumes at the next `{`.
 - A resumed session keeps the resumed id as its session id; if no snapshot is found, it starts fresh under that id.
 - A fresh session with only the system message leaves no snapshot.
