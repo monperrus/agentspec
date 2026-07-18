@@ -1,17 +1,30 @@
 # Context compaction
 
-Long sessions compact automatically. When a model call reports that its prompt reached a configurable token threshold, the agent asks the model to summarize the older part of the conversation into a summary aimed at continuing the task. That summary replaces the older messages. The most recent messages stay as they were. Compaction is on by default.
+Long sessions compact automatically. When a model call reports that its prompt reached a configurable token threshold, the agent asks the model to summarize the older part of the conversation into a summary aimed at continuing the task. That summary replaces the older messages. The most recent messages stay as they were. Compaction is on by default. A policy decides when it runs, and it can also be triggered on demand.
 
 ## Behaviour
 - Configuration comes from these agent spec fields. A programmatic caller can override each one per session, for single tasks, the sync REPL and the async REPL. An explicit override wins over the spec field, and the spec field wins over the default:
   - `compaction_enabled` (default `true`).
   - `compaction_trigger_tokens` (default `100000`): the prompt-token threshold.
   - `compaction_target_tokens` (default `20000`): the output-token limit (`max_tokens`) for the summary call.
-  - `compaction_keep_last_turns` (default `2`): how many of the most recent non-system messages stay unchanged.
-- Triggering relies only on usage metadata from the server. The agent never counts tokens locally. After each main model call's usage has been recorded, compaction runs when it is enabled and the response's `usage.prompt_tokens` is ≥ `compaction_trigger_tokens` and also > W + H (see hysteresis below). A missing value counts as 0. This check comes before the session token-budget check.
+  - `compaction_keep_last_turns` (default `2`): how many of the most recent non-system messages stay unchanged (subject to boundary snapping, below).
+  - `compaction_policy` (default `"threshold"`): when automatic compaction runs. One of `"threshold"`, `"every_turn"` or `"never"`. A programmatic caller may instead supply a custom decision function.
+  - `compaction_min_chars` (default `0`, meaning no minimum): compaction is skipped while the compactable text is shorter than this many characters.
+- Automatic compaction is considered at two phases of a turn: `mid_turn` (after each main model call's usage has been recorded, inside the tool loop) and `turn_end` (after a successful final answer, once the `session_usage` event has been emitted).
+- Policies:
+  - `threshold`: at `mid_turn`, the threshold check below. Nothing at `turn_end`.
+  - `every_turn`: at `mid_turn`, the same threshold check, as an overflow backstop. At `turn_end`, compaction is attempted unconditionally, whatever the token count and whatever `compaction_enabled` says. This attempt does not change the watermark W.
+  - `never`: no automatic compaction in either phase, whatever `compaction_enabled` says.
+  - Custom decision function: called at each phase with the session, the latest usage and the phase name (`mid_turn` or `turn_end`). Compaction is attempted whenever it returns true. It ignores `compaction_enabled`, the threshold and the watermark.
+- The turn's result (including its final reply) is captured before `turn_end` compaction, so it stays intact even if compaction summarizes the whole history.
+- Threshold check: triggering relies only on usage metadata from the server. The agent never counts tokens locally. At `mid_turn`, compaction runs when it is enabled and the response's `usage.prompt_tokens` is ≥ `compaction_trigger_tokens` and also > W + H (see hysteresis below). A missing value counts as 0. This check comes before the session token-budget check.
 - Hysteresis: the session keeps a watermark W, which starts at 0. Each time compaction is attempted, W becomes the prompt-token count that triggered the attempt, which is the count before compaction. H = `compaction_trigger_tokens` ÷ 4, rounded down. Compaction can therefore fire again only once the prompt count has grown by more than a quarter of the threshold past the last triggering count. This stops a "compaction storm": the remaining context (system, summary and kept messages) can still sit at or above the threshold, and without the watermark every following turn would compact again.
 - `/clear` resets W to 0.
 - Split: the kept suffix begins at the K-th most recent non-system message, where K = `compaction_keep_last_turns`, and runs to the end. The prefix is every message before that point. When K = 0, the suffix is empty and the prefix is the whole conversation.
+- Boundary snapping (K > 0): the suffix must start with a `user` message, so an assistant message with tool calls is never separated from its tool results and the summary is always followed by a user turn. If the naive start is not a `user` message, the agent walks back to the nearest earlier `user` message. That message must come after the first non-system message, so the prefix keeps something to compact. If there is none, it walks forward to the nearest later `user` message instead, which keeps fewer messages. If neither exists, nothing is compacted.
+- Nothing is compacted if the prefix, after snapping, holds no non-system message.
+- Minimum size: when `compaction_min_chars` is positive and the total `content` characters of the prefix's non-system messages is below it, nothing is compacted and no summary call is made. A summary of a tiny history would cost a call and could grow the context.
+- Manual compaction: a programmatic caller can compact a session on demand, with the same splitting, snapping and minimum-size rules. It learns whether the history was compacted (true) or skipped (false: nothing to compact, no clean boundary, below the minimum, a failed summary call or an empty summary). Manual compaction does not consult the policy, `compaction_enabled` or the watermark. The `/compact` slash command uses it.
 - The summary call is a separate chat completion to the session's model with `temperature` 0 and `max_tokens` = `compaction_target_tokens`. Its messages are the prefix, as-is, followed by one `user` message with exactly this text:
   ```
   Summarize the conversation above into a dense, structured summary optimized for continuing a coding task. Preserve all state needed to keep working without re-reading files.
@@ -51,4 +64,6 @@ Long sessions compact automatically. When a model call reports that its prompt r
 - If the conversation has K or fewer non-system messages, nothing is compacted and no summary call is made.
 - If the summary call fails, the agent emits an `error` event with text `Compaction failed: <error>` and appends a `compaction_error` trace record with `error` and `ts`. The conversation stays unchanged and the turn continues.
 - If the summary is empty or whitespace-only, the conversation stays unchanged and no event is emitted.
-- The kept suffix is cut by message count, not by user/assistant pairs. It can therefore begin in the middle of an exchange, for example with a tool result.
+- Example of snapping: with K = 2 and messages system, user u1, assistant a1, user u2, assistant with tool calls, tool result, assistant final, the naive start is the tool result. The boundary snaps back to u2, so the result is system, summary, u2, tool-call message, tool result, final.
+- Example with no clean boundary: with K = 2 and messages system, user u1, assistant a1, assistant a2, walking back reaches only u1, which is the first non-system message, and there is no later `user` message. Nothing is compacted and no summary call is made.
+- `every_turn` with too few messages or below the minimum size does nothing at turn end. No summary call is made.
