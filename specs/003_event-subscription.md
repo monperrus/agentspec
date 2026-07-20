@@ -26,6 +26,7 @@ A caller embedding the agent as a library can subscribe handlers to individual e
   - `session_restored` (a previously returned session object restored in memory): `session_id`.
   - `provider_pinned` (OpenRouter provider locked for the session): `provider`.
   - `compaction` (older context replaced by a summary): `summary`, `compacted_turns`.
+  - `cache_cold` (a strict-cache check was waived because the prefix cache expired on a cold resume): `age` (whole seconds since the last timestamped message).
 
 ## Edge cases
 - Emitting an event type with no subscribed handlers is not an error; only the generic handler runs.
