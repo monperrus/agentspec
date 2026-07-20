@@ -21,7 +21,7 @@ A caller embedding the agent as a library can subscribe handlers to individual e
   - `error` (API or dispatch error): `text`.
   - `final_answer` (the agent's final reply): `text`.
   - `token_limit` (token budget exceeded): `used` (effective, non-cached tokens), `limit`, `raw_total` (session raw API total), `cached_total` (session cached tokens).
-  - The `session_usage` display line appends `  |  effective <n>` (with `n = max(0, prompt - cached) + completion`) after the total, only when the session has cached tokens.
+  - The `session_usage` display line reads `[session tokens] prompt <p>  |  completion <c>`, with numbers using thousands separators (e.g. `1,234`). When the session has cached tokens, `  |  cached <n>` is inserted between the prompt and completion fields. The line shows no total and no effective count; the event data still carries `total`.
   - `session_resumed` (history loaded, or not found): `session_id`, `messages_loaded`, and optionally `source_model`.
   - `session_restored` (a previously returned session object restored in memory): `session_id`.
   - `provider_pinned` (OpenRouter provider locked for the session): `provider`.
