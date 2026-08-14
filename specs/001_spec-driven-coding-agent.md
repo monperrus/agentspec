@@ -78,7 +78,10 @@ The agent is a coding agent that works with any OpenAI-compatible chat-completio
   
   Merging joins the contents with a blank line (`\n\n`); if the earlier content is empty, the later content is used alone. The merged message takes the later message's `ts`. Converted messages keep the `ts` of the message they came from. The resumed history therefore has no tool calls and no `tool` messages.
 - A session can also be resumed by a short id of the form `<prefix>-<8 chars>` (any id whose last `-`-separated part is 8 characters long). When no snapshot file matches the id exactly, the short id matches a snapshot whose real session id hashes, as the first 8 lowercase hex digits of SHA-256 over its UTF-8 bytes, to that last part. The prefix is ignored. The current model's snapshots are searched first. Other models' snapshots are searched only when no other model has a snapshot with that exact id.
-- The agent shows the user a resume command, i.e. the shell command that continues the current session. By default it is `<program> <model> --session <session id>`, where `<program>` is the name the CLI was invoked as (for the REPL entry point, `agent-probe`).
+- The agent shows the user a resume command, i.e. the shell command that continues the current session. `<program>` is the running executable exactly as it was invoked (the path or name the process was started with), in both the one-shot and REPL modes.
+  - When `<program>` is the agent's own CLI, the resume command is `<program> <model> --session <session id>`, because that CLI takes the model as a positional argument. `<program>` counts as the agent's own CLI when its final path component is the agent's main command name or `agent-probe` (the REPL command), or when it resolves to the agent's own entry-point script.
+  - Any other executable is treated as a wrapper that pins its model, and the resume command is `<program> --session <session id>`, with no model argument (e.g. `/home/u/bin/agent-glm-5.2.py --session 4e55afe7c1ce`).
+  - A library caller can force the model argument to be included or omitted, overriding the executable-based decision.
 - An environment variable that overrides the resume command lets a wrapper script present itself: when it is set and non-empty, the resume command is `<value> --session <session id>`, with no model argument, because the wrapper is assumed to choose the model itself.
 
 ### Credentials and client
@@ -105,6 +108,8 @@ The agent is a coding agent that works with any OpenAI-compatible chat-completio
 - A `display_name` that is present is used verbatim in the banner, even when it is empty; the model name is not appended.
 - The startup tools line prefers `inferred_tool_schema` over `tool_specs`, the reverse of the order used when validating the spec.
 - If the resume-command override variable is set but empty, the default resume command is used.
+- The resume-command override variable, when set and non-empty, wins even when a library caller forces the model argument to be included.
+- An empty program name is never treated as the agent's own CLI, so it gets no model argument.
 - A shell command that exits non-zero is not an error result: its JSON has `stdout`, `stderr` and the non-zero `returncode`, and no `error` key.
 - A file of exactly 100 lines, read with no `offset` or `limit`, is returned whole with a bare `<CHECKSUM>` tag. A read that selects nothing (empty file, or `offset` past the end) still gets an envelope, with the checksum of the empty string (`e3b0c442`).
 - Search output lines with fewer than two `:` separators, or whose second field is not an integer line number, are silently left out of `matches`.
