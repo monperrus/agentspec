@@ -9,7 +9,7 @@ A library caller can hand a session object that session creation returned earlie
 - The restored session is a new top-level object. Replacing its fields does not change the session object the caller passed in.
 - A new log file is opened for the restored session, named with the kept session id, following the usual log path layout. The restored session logs to this file, not to the original session's file.
 - The compaction watermark (the last observed prompt-token count) is reset to 0.
-- These caller arguments override the restored values when supplied (not null): event handler, cache key, output-token cap, tool executor, `compaction_enabled`, `compaction_trigger_tokens`, `compaction_target_tokens`, `compaction_keep_last_turns`, `compaction_policy`, `compaction_min_chars`. Arguments left unset keep the restored values.
+- These caller arguments override the restored values when supplied (not null): event handler, cache key, output-token cap, tool executor, `compaction_enabled`, `compaction_trigger_tokens`, `compaction_target_tokens`, `compaction_keep_last_turns`, `compaction_policy`, `compaction_min_chars`, `min_cacheable_tokens`. Arguments left unset keep the restored values.
 - On restore, a `session_restored` log record is written with `session_id` and `ts` (ISO seconds). A `session_restored` event with data field `session_id` is also emitted, with the display string `Restored session <session id> (<number of messages> messages)`, dimmed.
 
 ## Edge cases

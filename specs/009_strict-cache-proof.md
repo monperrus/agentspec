@@ -12,7 +12,9 @@ By default the agent runs fail-closed on prompt caching: after the first model c
 - These normalized values feed the per-response `usage` event/log record and the session totals (`cached`, `cache_write`) for every response, regardless of strict mode.
 - In strict mode, for each response with a usage block, once the session count is 2 or more:
   - No cache-proof field → the turn aborts with the error `Strict cache mode requires explicit cache accounting from the server after the first LLM call, but this response exposed no cache-proof field.`
-  - Cached tokens ≤ 0 → the turn aborts with the error `Strict cache mode requires cached_tokens > 0 after the first LLM call, but the server reported no cache hit.`
+  - Cached tokens ≤ 0 → the turn aborts with the error `Strict cache mode requires cached_tokens > 0 after the first LLM call, but the server reported no cache hit.`, unless the minimum-cacheable floor below applies.
+- Minimum cacheable prompt size: providers cache nothing below a provider-specific prompt size (e.g. ~4096 tokens for small Claude models, ~1024 for some GPT models). The floor is set by the agent spec field `min_cacheable_tokens` (integer, prompt tokens), overridable per session by a programmatic argument (single task, REPLs, session creation) or by the CLI flag `--min-cacheable-tokens N`; an explicit argument or flag wins over the spec field. Default is 0 (no floor).
+  - When the floor is nonzero and a response has cache proof, cached tokens ≤ 0, and its `usage.prompt_tokens` (0 if absent) is strictly below the floor, the turn does not abort: the agent emits a `cache_below_minimum` event with `prompt_tokens` and `min_cacheable_tokens`, displayed dim as `No cache hit, but prompt (<prompt_tokens> tokens) is below the provider's minimum cacheable prefix (<min_cacheable_tokens> tokens); not a caching failure.`, and the response is processed normally.
 - In strict mode, a response with no usage block after at least one counted call aborts the turn with the error `Strict cache mode requires usage metadata on every LLM call after the first, but the server returned no usage block.`
 - Cold resume: before either check above, the agent measures the age of the session's most recent message that carries a timestamp (`ts`, ISO 8601 local time), as now minus that timestamp. If the age is strictly greater than 3600 seconds, the prefix cache is assumed to have expired:
   - A response with a usage block that lacks cache proof or reports cached tokens ≤ 0 does not abort; the agent emits a `cache_cold` event with `age` (whole seconds) and the dim display line `Prefix cache expired (last message <age>s old); this turn was not served from cache and will re-process the prompt.` and the response is processed normally.
@@ -30,4 +32,8 @@ By default the agent runs fail-closed on prompt caching: after the first model c
 - The first counted call never emits `cache_cold`, since it is never checked.
 - An age of exactly 3600 seconds or less is warm: misses abort as usual.
 - If no message has a timestamp, or the most recent timestamp cannot be parsed, the age is unknown and the strict checks apply unchanged.
-- The relaxation is not limited to one event: every qualifying check while the age exceeds the threshold emits its own `cache_cold` event.
+- A prompt size equal to or above the floor with no cache hit aborts as usual; a floor of 0 or null disables the relaxation.
+- The floor does not excuse a missing cache-proof field or a missing usage block; those still abort.
+- The cold-resume check runs first: if the session is cold, `cache_cold` is emitted instead of `cache_below_minimum`.
+- A cache hit (cached tokens > 0) never emits `cache_below_minimum`, whatever the prompt size.
+- The cold-resume relaxation is not limited to one event: every qualifying check while the age exceeds the threshold emits its own `cache_cold` event.
