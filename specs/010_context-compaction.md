@@ -62,7 +62,7 @@ Long sessions compact automatically. When a model call reports that its prompt r
 - With the default threshold of 100000: after a compaction triggered at 100000, later calls reporting 100000 or 100001 do not compact. Only a call reporting more than 125000 compacts again.
 - W is updated whenever an attempt is made, even if the attempt compacts nothing (too few messages), fails, or produces an empty summary.
 - If the conversation has K or fewer non-system messages, nothing is compacted and no summary call is made.
-- If the summary call fails, the agent emits an `error` event with text `Compaction failed: <error>` and appends a `compaction_error` trace record with `error` and `ts`. The conversation stays unchanged and the turn continues.
+- If the summary call fails, the agent emits an `error` event with text `Compaction failed: <error>` and appends a `compaction_error` trace record with `error` (the same `Compaction failed: <error>` text), the structured error diagnostic fields, and `ts`. The conversation stays unchanged and the turn continues.
 - If the summary call fails with a rate-limit error (HTTP 429 with no stated retry delay), the `error` event text is `Compaction rate limited: <error>` and the `compaction_error` record also has `error_kind` set to `rate_limit`. Otherwise it is handled like any other failure.
 - If the summary is empty or whitespace-only, the conversation stays unchanged and no event is emitted.
 - Example of snapping: with K = 2 and messages system, user u1, assistant a1, user u2, assistant with tool calls, tool result, assistant final, the naive start is the tool result. The boundary snaps back to u2, so the result is system, summary, u2, tool-call message, tool result, final.

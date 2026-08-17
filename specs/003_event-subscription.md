@@ -18,7 +18,7 @@ A caller embedding the agent as a library can subscribe handlers to individual e
   - `content_delta` / `reasoning_delta` (streamed text or reasoning chunk): `text`, `first`, `no_newline`.
   - `content_stream_end` / `reasoning_stream_end` (end of a streamed sequence): `no_newline`.
   - `usage` (per-turn token usage) and `session_usage` (cumulative, emitted with the final answer): `prompt`, `completion`, `total`, `cached`, `cache_write`.
-  - `error` (API or dispatch error): `text`.
+  - `error` (API or dispatch error): `text`, `error_class`, `http_status`, `elapsed_s`, `adapter` (see the structured error diagnostics spec).
   - `final_answer` (the agent's final reply): `text`.
   - `token_limit` (token budget exceeded): `used` (effective, non-cached tokens), `limit`, `raw_total` (session raw API total), `cached_total` (session cached tokens).
   - The `session_usage` display line reads `[session tokens] prompt <p>  |  completion <c>`, with numbers using thousands separators (e.g. `1,234`). When the session has cached tokens, `  |  cached <n>` is inserted between the prompt and completion fields. The line shows no total and no effective count; the event data still carries `total`.
