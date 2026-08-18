@@ -28,6 +28,7 @@ A caller embedding the agent as a library can subscribe handlers to individual e
   - `compaction` (older context replaced by a summary): `summary`, `compacted_turns`.
   - `cache_cold` (a strict-cache check was waived because the prefix cache expired on a cold resume): `age` (whole seconds since the last timestamped message).
   - `journal_recovered` (a resumed session was rebuilt from the durable journal): `entries_replayed`, `messages_loaded`, `pending` (number of in-flight tool calls), `mid_turn`.
+  - `rate_limit_wait` (a retryable HTTP 429 was received and the agent is about to wait before resending): `delay` (seconds, a number), `resume_at` (ISO 8601 timestamp including the UTC offset, equal to the local time when the wait started plus `delay`). `fmt` is the `[rate-limited] waiting …` line printed to the console for the same wait (without a trailing newline). The event fires once per wait, before the wait starts, for the model calls of a turn (streaming or not) and for compaction summary calls.
 
 ## Edge cases
 - Emitting an event type with no subscribed handlers is not an error; only the generic handler runs.
@@ -35,4 +36,5 @@ A caller embedding the agent as a library can subscribe handlers to individual e
 - After unsubscribing, the handler is no longer called; other handlers for that type are unaffected.
 - When a built-in write or replacement fails (the result starts with `ERROR:`), `files` and `diff_summary` are null.
 - Read-only tools, shell commands and custom tools that report no file metadata yield null `files` and `diff_summary`.
+- `rate_limit_wait` never fires for a 429 without a usable retry delay (that is a rate-limit error, not a wait), for client-side RPM throttling waits, for read-timeout retries, or for `run://` subprocess backends. The `[rate-limited]` console line is still printed directly, in addition to the event.
 - Subscribing to an event type name that the agent never emits is accepted; the handler is simply never called.
