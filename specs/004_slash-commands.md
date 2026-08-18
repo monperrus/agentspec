@@ -1,6 +1,6 @@
 # Slash commands
 
-In the interactive REPL and the interactive CLI loop, a line that starts with `/` is a slash command. The agent handles it locally and never sends it to the model. The built-in commands are `/clear`, `/compact`, `/model`, `/usage` and `/help`. A caller can register more commands or remove existing ones. Each command has a name and a one-line description.
+In the interactive REPL and the interactive CLI loop, a line that starts with `/` is a slash command. The agent handles it locally and never sends it to the model. The built-in commands are `/c`, `/clear`, `/compact`, `/model`, `/usage` and `/help`. A caller can register more commands or remove existing ones. Each command has a name and a one-line description.
 
 ## Behaviour
 - Before a non-empty input line is treated as a task, the agent checks the exit words (`exit`, `quit`, `q`) first, then slash commands.
@@ -9,11 +9,15 @@ In the interactive REPL and the interactive CLI loop, a line that starts with `/
 - If a command fails, the agent prints `Error running /<name>: <message>` and the loop continues.
 - After a slash command runs, the conversation snapshot is saved under the same rules as after a turn.
 - `/help` prints `Available slash commands:` followed by one line per registered command, sorted by name: `  /<name padded to 12>  <description>`. The built-in descriptions are:
+  - `c`: "Retry an interrupted turn without adding a user message."
   - `clear`: "Reset the session message history (keep system prompt)."
   - `compact`: "Summarize older history into a compact continuation summary."
   - `model`: "List available models or switch: /model <model-id>."
   - `usage`: "Show token usage for the current session."
   - `help`: "Show this help message."
+- `/c` (continue) prints nothing. Right after it, the REPL runs a new turn on the conversation as it stands, without adding a user message. The request re-sends the existing transcript unchanged. No user message is merged or appended, and no `user` log record is written. The session journal's `turn_start` record has a `null` task. This turn replaces the usual snapshot save after a slash command. The turn itself saves the snapshot as any turn does, and it gets the same interruption, error and event handling.
+  - Example: the user sends `work`, the turn is interrupted, then the user enters `/c`. The retry request's only user message is `work`.
+  - In the asynchronous REPL (see type-ahead input queue), a `/c` queued during a turn adds a retry to the pending instructions, where a text line would go. The retry runs as a follow-on turn in the same way.
 - `/compact` compacts the history right away, using manual compaction (see context compaction) with the session's current model. The argument string is ignored. If the history was compacted, it prints `Context compacted: <before> → <after> messages.`, where the counts are total messages including system messages. Otherwise it prints `Nothing to compact.`
 - `/clear` removes every message except the system messages. If there are none, it keeps only the first message. It also sets the cumulative usage totals (`prompt`, `completion`, `total`, `cached`, `cache_write`) to 0, resets the compaction watermark (see context compaction) so a new growth cycle can trigger compaction, and prints `Context cleared. Session history has been reset.`
 - `/model <id>` sets the session model to `<id>`, taken verbatim with surrounding whitespace trimmed. It prints `Model switched from <old> → <new>` and `The next turn will use the new model.` Every later turn in that session calls the new model.
@@ -47,4 +51,6 @@ In the interactive REPL and the interactive CLI loop, a line that starts with `/
 - `/model <id>` does not check whether the model exists and does not reload the agent spec. The session keeps its tool schema and dispatch table.
 - The cached percentage is 0 when there are no prompt tokens.
 - If the tool gets a `command` outside the five built-ins, it runs nothing and returns `ERROR: unknown command '<command>'. Valid: clear, compact, model, usage, help`. Commands registered by a caller are not reachable through the tool.
+- `/c` ignores its argument string. It does not check whether the last turn was actually interrupted: it always re-sends the current transcript as is, even when that transcript ends with an assistant message.
+- `/c` is not one of the commands the `slash_command` tool offers to the model.
 - A line such as `/tmp/file` counts as a slash command (the unknown command `tmp/file`), so it never reaches the model.
