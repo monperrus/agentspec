@@ -9,10 +9,10 @@ Besides standard function tool calls, the agent accepts custom tool calls (OpenA
 - A custom call is dispatched to the tool named `custom.name` with exactly one argument, `input`, whose value is the raw input text, unchanged. No JSON parsing is attempted, so input that is not valid JSON is passed through as is. The usual dispatch rules (`tool_dispatch`, `param_map`, missing-implementation errors) then apply as for function calls.
 - The tool result is appended as a normal `tool` message referencing the call's `id`.
 - In the assistant history message, a custom call is recorded as `{"id": <id>, "type": "custom", "custom": {"name": <name>, "input": <raw text>}}`, and a function call as `{"id": <id>, "type": "function", "function": {"name": <name>, "arguments": <arguments>}}`. Custom calls are therefore sent back to the provider in their original shape on later turns.
-- When a snapshot is flattened to plain text for resume, a custom call becomes an assistant message with content `[Tool call: <name>(<input>)]`, with the raw input text in place of the arguments string.
+- When a resumed history is flattened to plain text (only for providers that reject stale tool call ids), a custom call is summarised like a function call, `prior tool use: <name>(<input>) -> <outcome>`, with the raw input text in place of the arguments string. By default a resumed history keeps custom calls in their original shape.
 - When a resumed session's history is replayed on screen, a custom call is displayed like a function call whose arguments are `{"input": <raw text>}`.
 
 ## Edge cases
 - A custom `input` that is not a string (e.g. a JSON object) is serialized to JSON text (non-ASCII characters kept as is) and that text is used as the raw input.
 - A missing custom `input` is the empty string; a missing custom `name` is the empty string when parsing a response, and `?` when flattening or replaying history.
-- When flattening for resume, a function call with a missing `name` is shown as `?` and a missing `arguments` as the empty string.
+- When flattening for resume, a function call with a missing `name` is shown as `?` and a missing `arguments` as the empty string. A custom input that is not a string is serialized to JSON text before being summarised.
