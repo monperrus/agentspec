@@ -44,7 +44,7 @@ The conversation snapshot is only written at turn boundaries, so a crash mid-tur
     Verify the resulting state (inspect files, re-run read-only checks) before re-running any of them.
     ```
     `<calls>` has one line per pending call, `- <name>(<args as JSON, non-ASCII as is>)`, joined by newlines.
-  - Then, if there are unreceived results, another user message (with `ts`) is appended: `SYSTEM RECOVERY NOTE: These tool calls completed just before the crash but their results were never shown to you. Do NOT re-run them; treat these results as observed:\n<results>`. `<results>` has one line per result, `- <label>: <result>`, joined by newlines. `<label>` is the record's tool name when it has one, and otherwise the call id. `tool_end` records carry no name, so in practice the label is the call id.
+  - Then, if there are unreceived results, another user message (with `ts`) is appended: `SYSTEM RECOVERY NOTE: These tool calls completed just before the crash but their results were never shown to you; treat these results as observed:\n<results>`. The note contains no "do not re-run" interdiction. `<results>` has one line per result, `- <label>: <result>`, joined by newlines. `<label>` is the record's tool name when it has one, and otherwise the call id. `tool_end` records carry no name, so in practice the label is the call id.
 - Neither pending nor completed tool calls are re-executed by recovery.
 
 ## Edge cases

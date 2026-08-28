@@ -38,14 +38,12 @@ Long sessions compact automatically. When a model call reports that its prompt r
   - Unresolved issues or blockers
   - The immediate next step if one was identified
 
-  Avoid:
-  - Conversational filler or chatter
-  - Repeated log output (summarize outcomes, don't quote logs verbatim)
-  - Redundant observations
-  - Rewriting uncertainty as certainty
-
-  Format the summary as plain text with clear sections. Be concise but complete.
+  Style:
+  - Plain text with clear sections. Be concise but complete.
+  - Summarize outcomes; quote logs only where the exact bytes matter.
+  - Report each fact once. Keep uncertainty expressed as uncertainty.
   ```
+  The text ends with a newline after the last `Style:` bullet. The prompt states what a good summary looks like; it has no list of things to avoid.
 - The summary is the reply content with leading and trailing whitespace removed. On success, the conversation becomes: the system messages from the prefix, then one summary message, then the suffix. The summary message has `role` `assistant`, `content` set to the summary, `compacted_summary: true`, and `ts`, an ISO-8601 timestamp in seconds.
 - After a successful compaction the agent:
   - emits a `compaction` event with `summary`, `compacted_turns` (the number of non-system messages in the prefix) and `fmt` (a dim line `[compaction] <n> turns summarized (<chars> chars)`, followed by two spaces and a highlighted `ratio <r>x`, with r to 1 decimal place);
