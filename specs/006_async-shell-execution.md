@@ -1,10 +1,11 @@
 # Asynchronous shell execution
 
-The implementation registry offers two more built-in implementations that let a model run shell commands in the background: start a command (optionally after a delay of some minutes, so the model can schedule a check without busy-polling) and poll it later. When a command finishes almost at once with small output, the output comes back inline in the start result, which saves a polling round-trip. An agent spec refers to them in `tool_dispatch` by the implementation names `t_execute_async` and `t_query_exec`.
+The implementation registry offers two more built-in implementations that let a model run shell commands in the background: start a command (optionally after a delay of some seconds, so the model can schedule a later check without blocking and without busy-polling) and poll it later. When a command finishes almost at once with small output, the output comes back inline in the start result, which saves a polling round-trip. An agent spec refers to them in `tool_dispatch` by the implementation names `t_execute_async` and `t_query_exec`.
 
 ## Behaviour
-- Start (`t_execute_async`, argument `command` (string, required) and `when` (integer minutes, optional, default 0)):
-  - If `when` is non-zero, first blocks for `when` minutes; nothing is spawned and no execution id exists until the wait ends. With `when` 0 or absent it starts at once.
+- Start (`t_execute_async`, argument `command` (string, required) and `wait_before_s` (number of seconds, optional, default 0)):
+  - With `wait_before_s` 0 or absent the command starts at once, as described below.
+  - With a positive `wait_before_s` the call does not block: it registers the execution and returns at once the JSON object `{"tool_exec_id", "scheduled_for", "starts_in_seconds", "cwd", "stdin_localfile", "stdout_localfile", "stderr_localfile", "command"}`, in that key order. `scheduled_for` is the local wall-clock time at which the command will start (same format as `started_at`), `starts_in_seconds` is the delay (3 decimals), and there is no `pid`. The command is spawned in the background once the delay has elapsed, then behaves like an immediate start that is still running (it is polled, waited on and reported like any other execution).
   - The capture directory is `~/.cache/async_agent_execs/<session_id>/`, where `<session_id>` is the id of the session whose tool call started the command. The session id is known to every tool invocation because it is recorded before each tool dispatch.
   - Runs the command string through the system shell in a new process group/session. Stdout and stderr go to the capture files `<capture dir>/<id>.stdout` and `<id>.stderr`. `<id>` is a new random 12-character lowercase hex execution id.
   - The process's stdin is a named FIFO created at `<capture dir>/<id>.stdin`. Bytes written to that path by anyone (the write-file tool, a shell redirect such as `echo yes > <path>`) are delivered to the running process's stdin.
@@ -18,18 +19,21 @@ The implementation registry offers two more built-in implementations that let a 
 - Poll (`t_query_exec`, argument `tool_exec_id`):
   - Returns a JSON object with `completed` (boolean), `returncode` (always present: `null` while the command is running, the integer exit status once completed), `started_at` (the same value the start result returned), `cwd` (the same working directory the start result returned), `duration_time` (seconds since start, rounded to 3 decimals), `stdin_localfile` (the FIFO path), `stdout_localfile_size` and `stderr_localfile_localsize` (current capture file sizes in bytes; the field names are exactly these).
   - When completed, it also has, under the same 4096-byte rule for each stream, `stdout` and/or `stderr`.
+  - While a delayed execution has not started yet, it instead returns `{"completed": false, "scheduled": true, "starts_in_seconds" (remaining delay, 3 decimals, never below 0), "started_at" (the planned start time), "cwd", "command", "stdout_localfile", "stderr_localfile"}`.
 - Each implementation returns its text result together with metadata `{"result": <same text>}`.
 - When a `read_file` tool call's `path`, after expanding a leading `~` to the home directory, is exactly the stdout or stderr capture file path of a command started in the current process, the displayed tool result is prefixed with a yellow line `  shell output from: <command>` (the label bold), followed by the usual dimmed result display. The result sent to the model and written to the session log is unchanged.
 - There is no longer a standalone ready-made asynchronous coding agent; the grace-period coding agent is the ready-made agent that offers these implementations to the model.
 
 ## Edge cases
 - When no session id is available (the start implementation is called outside a session's tool dispatch, or the session has no id), files go directly into `~/.cache/async_agent_execs/` with no subdirectory.
-- The capture directory is chosen when the command is spawned, i.e. after any `when` delay.
+- `wait_before_s` below 0 returns `{"error": "wait_before_s must be >= 0"}` and above 3600 returns `{"error": "wait_before_s exceeds the 3600s cap"}`; in both cases nothing is registered or spawned. Exactly 3600 is accepted; fractional values are accepted.
+- For a delayed start, the capture directory and file paths are fixed when the call is made, but the FIFO and capture files are created only when the command starts, so stdin can only be delivered from then on.
 - Output inlining is decided per stream: a small stdout is inlined even when stderr is too big, and vice versa. A stream whose capture file cannot be read is omitted.
 - Polling an id that was not started in the current process returns `{"error": "unknown tool_exec_id: <id>"}`. Execution ids do not survive a process restart, even though their capture files stay on disk.
 - A missing capture file is reported with size 0.
 - A `read_file` path that is not a capture path of a known execution (another file, the stdin FIFO path, a relative spelling of the path, or an execution from an earlier process) gets no `shell output from:` line.
-- A delayed start runs the command only after the full wait, and the call does not return during the wait. The 100 ms inline window and `duration_time` count from the actual spawn, not from the call. A delayed command still running 100 ms after spawn returns only its id and capture paths, and must be polled.
+- For a delayed start, `started_at` and `duration_time` count from the planned start, not from the call. Its output is never inlined in the start result. A delayed command that exits within 100 ms of its start publishes no completion event; its final state is still available by polling.
+- The former `when` argument (integer minutes, blocking the call during the delay) no longer exists.
 - The former implementation name `t_plan_delay` and tool `plan_shell_command` no longer exist; an agent spec that names `t_plan_delay` in `tool_dispatch` refers to an unknown implementation.
 - Start and poll never wait for or kill a long-running command. It keeps running until it exits by itself.
 - The agent keeps its own write end of the FIFO open while the process runs, so a writer closing the FIFO does not send end-of-file: a command that reads stdin until EOF (e.g. `cat`) keeps waiting for more input. The agent's write end is closed once the process exits.
