@@ -20,7 +20,7 @@ The conversation snapshot is only written at turn boundaries, so a crash mid-tur
   - `tool_start`: `call_id`, `name`, `args`. Written before the tool runs.
   - `tool_end`: `call_id`, `name`, `result` (the result text returned to the model). Written after the tool returns. When the tool fails, the record also has `outcome`:
     - `fatal_error`: the tool ended the process with a fatal error. `result` is the error text. The record is written before the process exits.
-    - `error`: the tool raised any other error. `result` is `ERROR: <error message>`. After the record, a `tool_result` event with that text is emitted and a `tool_error` log record (`name`, the implementation name, `result`, `ts`) is written, then the error propagates to the caller.
+    - `error`: the tool raised any other error. `result` is `ERROR: tool '<tool name>' raised <error type name>: <error message> (<frame list>)`, where the frame list is the innermost (up to) three stack frames, innermost last, each `<source file base name>:<line> in <function name>`, joined by `, `. After the record, a `tool_result` event with that text is emitted and a `tool_error` log record (`name`, the implementation name, `result`, `ts`) is written, then the error propagates to the caller.
   - `reset_messages`: `reason` and `messages` (the full replacement history). Written when the history is replaced: `reason` is `compaction` after context compaction, `clear` after `/clear`, and `user_merge` when the new user input is merged into a trailing user message (so replay does not invent a second user message).
 - `call_id` is the provider's tool-call id for structured tool calls. For inline tool calls, which have no provider id, it is a fresh random 12-hex-character id per call.
 
