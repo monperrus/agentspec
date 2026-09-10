@@ -15,11 +15,10 @@ Every error the agent reports, as an `error` event and as a log record, carries 
 - The fields are present on every error path:
   - A failed model call during a turn, including a rate-limit failure (`error` record; `elapsed_s` measured from the start of that call).
   - A failed or rate-limited compaction summary call (`compaction_error` record; `elapsed_s` measured from the start of the summary call).
-  - A strict-cache abort, both for a missing usage block and for a failed cache proof (`error` record; `elapsed_s` null, `http_status` null).
+  - A strict-cache abort on the first model call of a session (`error` record; `elapsed_s` null, `http_status` null).
   - An unexpected error during a REPL or interactive CLI turn (`error` record; `elapsed_s` null).
 
 ## Edge cases
 - A status value that is missing or not an integer yields `http_status` null; the fields are still present.
 - `elapsed_s` is never negative.
-- A strict-cache abort caused by a missing usage block reports `error_class` as a generic runtime error type (`RuntimeError`).
 - A `run://` endpoint reports `adapter` `subprocess` even if the injected client is not the built-in subprocess backend.
