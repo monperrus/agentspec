@@ -36,5 +36,5 @@ A caller embedding the agent as a library can subscribe handlers to individual e
 - After unsubscribing, the handler is no longer called; other handlers for that type are unaffected.
 - When a built-in write or replacement fails (the result starts with `ERROR:`), `files` and `diff_summary` are null.
 - Read-only tools, shell commands and custom tools that report no file metadata yield null `files` and `diff_summary`.
-- `rate_limit_wait` never fires for a 429 without a usable retry delay (that is a rate-limit error, not a wait), for client-side RPM throttling waits, for read-timeout retries, or for `run://` subprocess backends. The `[rate-limited]` console line is still printed directly, in addition to the event.
+- `rate_limit_wait` never fires for a 429 without a usable retry delay (that is a rate-limit error, not a wait), for client-side RPM throttling waits, for read-timeout retries, for transient 5xx retries, or for `run://` subprocess backends. The `[rate-limited]` console line is still printed directly, in addition to the event.
 - Subscribing to an event type name that the agent never emits is accepted; the handler is simply never called.
