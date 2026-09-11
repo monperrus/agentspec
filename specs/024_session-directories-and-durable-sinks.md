@@ -29,6 +29,7 @@ A library caller can give one session an explicit directory that holds its journ
   - `model_request_attempt` with `attempt` = `{"payload": <request body>}`: written before each attempt to send the request, including retries.
   - `model_response_frame` with `frame`, written as the response arrives: `{"kind": "payload", "payload": <parsed JSON body>}` for a non-streaming HTTP response, `{"kind": "sse", "line": <line>}` for every streamed line (blank lines included), and `{"kind": "subprocess", "stdout": ..., "stderr": ...}` for a subprocess-backed model.
   - `model_response` with `response` = `{"content", "reasoning", "tool_calls"}`, each tool call as `{"id", "type", "name", "arguments"}`. Written after the call returns, before the agent acts on it.
+  - For the pre-compaction preservation call: the same pair with `purpose: "pre_compaction"` and the same `request` and `response` shapes as below. The `model_response` record is written only when the call succeeds.
   - For context compaction: a `model_request` with `purpose: "compaction"` and `request` = `{"model", "messages", "temperature": 0, "max_tokens": <compaction target tokens>}`, and a `model_response` with `purpose: "compaction"` and `response` = `{"content"}`.
 - Journal recovery records (`turn_start`, `turn_end`, `message`, `tool_start`, `tool_end`, `reset_messages`) are also mirrored to the sink.
 

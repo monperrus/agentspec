@@ -1,6 +1,6 @@
 # Context compaction
 
-Long sessions compact automatically. When a model call reports that its prompt reached a configurable token threshold, the agent asks the model to summarize the older part of the conversation into a summary aimed at continuing the task. That summary replaces the older messages. The most recent messages stay as they were. Compaction is on by default. A policy decides when it runs, and it can also be triggered on demand.
+Long sessions compact automatically. When a model call reports that its prompt reached a configurable token threshold, the agent first asks the model to write down the state it needs to keep working, then asks it to summarize the older part of the conversation into a summary aimed at continuing the task. That summary replaces the older messages. The most recent messages stay as they were. Compaction is on by default. A policy decides when it runs, and it can also be triggered on demand.
 
 ## Behaviour
 - Configuration comes from these agent spec fields. A programmatic caller can override each one per session, for single tasks, the sync REPL and the async REPL. An explicit override wins over the spec field, and the spec field wins over the default:
@@ -25,7 +25,13 @@ Long sessions compact automatically. When a model call reports that its prompt r
 - Nothing is compacted if the prefix, after snapping, holds no non-system message.
 - Minimum size: when `compaction_min_chars` is positive and the total `content` characters of the prefix's non-system messages is below it, nothing is compacted and no summary call is made. A summary of a tiny history would cost a call and could grow the context.
 - Manual compaction: a programmatic caller can compact a session on demand, with the same splitting, snapping and minimum-size rules. It learns whether the history was compacted (true) or skipped (false: nothing to compact, no clean boundary, below the minimum, a failed summary call or an empty summary). Manual compaction does not consult the policy, `compaction_enabled` or the watermark. The `/compact` slash command uses it.
-- The summary call is a separate chat completion to the session's model with `temperature` 0 and `max_tokens` = `compaction_target_tokens`. Its messages are the prefix, as-is, followed by one `user` message with exactly this text:
+- Compaction runs in two phases, each a separate model call. Both run only after the split, snapping and minimum-size checks pass. Every compaction attempt that reaches the model therefore makes two calls: preservation, then summary.
+- Phase 1, preservation: a chat completion to the session's model with `temperature` 0 and `max_tokens` = `compaction_target_tokens`. Its messages are the prefix, as-is, followed by one `user` message with exactly this text (a single line):
+  ```
+  Context compaction is about to run: the earlier part of this conversation will soon be replaced by a summary. Before that happens, write down everything you will need to keep working on this task afterwards — key facts, decisions made, current state of the work, important file contents or identifiers, and the immediate next steps. Anything you do not record now may be lost. Reply briefly once done.
+  ```
+  If the reply content, with leading and trailing whitespace removed, is non-empty, two messages are appended to the prefix: that `user` preservation prompt and an `assistant` message whose `content` is the stripped reply. These appended messages only feed the summary call. They are not kept in the conversation afterwards: they are summarized away with the rest of the prefix.
+- Phase 2, summary: a chat completion to the session's model with `temperature` 0 and `max_tokens` = `compaction_target_tokens`. Its messages are the prefix (including any phase-1 exchange), followed by one `user` message with exactly this text:
   ```
   Summarize the conversation above into a dense, structured summary optimized for continuing a coding task. Preserve all state needed to keep working without re-reading files.
 
@@ -60,6 +66,8 @@ Long sessions compact automatically. When a model call reports that its prompt r
 - With the default threshold of 100000: after a compaction triggered at 100000, later calls reporting 100000 or 100001 do not compact. Only a call reporting more than 125000 compacts again.
 - W is updated whenever an attempt is made, even if the attempt compacts nothing (too few messages), fails, or produces an empty summary.
 - If the conversation has K or fewer non-system messages, nothing is compacted and no summary call is made.
+- If the preservation call fails for any reason, compaction still goes ahead. The agent emits a `compaction_preparation_skipped` event with `reason` (the error text), adds nothing to the prefix, and makes the summary call.
+- An empty or whitespace-only preservation reply adds nothing to the prefix and emits no event. The summary call still runs.
 - If the summary call fails, the agent emits an `error` event with text `Compaction failed: <error>` and appends a `compaction_error` trace record with `error` (the same `Compaction failed: <error>` text), the structured error diagnostic fields, and `ts`. The conversation stays unchanged and the turn continues.
 - If the summary call fails with a rate-limit error (HTTP 429 with no stated retry delay), the `error` event text is `Compaction rate limited: <error>` and the `compaction_error` record also has `error_kind` set to `rate_limit`. Otherwise it is handled like any other failure.
 - If the summary is empty or whitespace-only, the conversation stays unchanged and no event is emitted.
