@@ -45,7 +45,11 @@ The conversation snapshot is only written at turn boundaries, so a crash mid-tur
     Verify the resulting state (inspect files, re-run read-only checks) before re-running any of them.
     ```
     `<calls>` has one line per pending call, `- <name>(<args as JSON, non-ASCII as is>)`, joined by newlines.
-  - Then, if there are unreceived results, another user message (with `ts`) is appended: `SYSTEM RECOVERY NOTE: These tool calls completed just before the crash but their results were never shown to you; treat these results as observed:\n<results>`. The note contains no "do not re-run" interdiction. `<results>` has one line per result, `- <label>: <result>`, joined by newlines. `<label>` is the record's tool name when it has one, and otherwise the call id (journals written before `tool_end` carried `name`).
+  - Then the unreceived results are filtered to the relevant ones: those whose call id equals the `id` of some tool call carried by an assistant message in the session history as normalised above. Results of calls that are no longer in the history (for example, summarised away by compaction, or flattened because `behaviour.resume_rejects_stale_tool_call_ids` is `true`) are dropped.
+  - If at least one relevant result remains, another user message (with `ts`) is appended: `SYSTEM RECOVERY NOTE: These tool calls completed just before the crash but their results were never shown to you; treat these result digests as observed (re-run the tool if you need the full output):\n<results>`. The note contains no "do not re-run" interdiction.
+  - `<results>` has one line per relevant result, `- <label>: <digest>`, joined by newlines. `<label>` is the record's tool name when it has one, and otherwise the call id (journals written before `tool_end` carried `name`).
+  - `<digest>` is the result text with every run of whitespace (including newlines) collapsed to a single space and leading/trailing whitespace removed. When that is longer than 200 characters, it is cut to its first 200 characters followed by `…[+<number of characters removed> chars]`.
+  - When the joined `<results>` text is longer than 4000 characters, it is cut to its first 4000 characters followed by `\n…[truncated]`.
 - Neither pending nor completed tool calls are re-executed by recovery.
 
 ## Edge cases
@@ -54,4 +58,5 @@ The conversation snapshot is only written at turn boundaries, so a crash mid-tur
 - A missing journal file replays to nothing: the resume uses the snapshot exactly as before. This covers sessions from before durability existed and sessions run with durability off.
 - The rebuilt history holds only what the journal recorded. Messages that existed before the journal was started are not part of it unless a `reset_messages` record carried them. The system prompt is part of it only when durable capture journaled it (see the session directories and durable sinks spec).
 - The journal is never truncated. Compaction and `/clear` append a `reset_messages` record, so replay reproduces the replaced history rather than the discarded one.
-- A tool call with a `tool_end` whose `tool` message was also journaled counts as received and gets no recovery note. Inline tool calls never produce `tool` messages, so a completed inline call always counts as unreceived.
+- A tool call with a `tool_end` whose `tool` message was also journaled counts as received and gets no recovery note. Inline tool calls never produce `tool` messages, so a completed inline call always counts as unreceived; but they also carry no structured tool call in the history, so they are never relevant and never appear in the note.
+- The unreceived-results note is bounded (about 4000 characters of results) regardless of how many calls finished or how large their outputs were, so it can never outgrow the context window, even after compaction keeps it as the last turn. Raw tool output is never replayed into it.
