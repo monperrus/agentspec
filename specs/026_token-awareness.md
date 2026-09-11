@@ -9,6 +9,7 @@ The agent puts the true token count into the model's own context, so the model c
   - `token_awareness_reminder_tokens` (default `6144`): the reminder threshold T.
   - `token_awareness_update_every` (default `1`): the countdown is injected only after every N-th counted model call. Values below 1 are treated as 1.
 - The spec field `context_window` (integer, optional) declares the model's context window in tokens. It currently only serves as the budget fallback. A value above the compaction trigger does not delay compaction.
+- CLI flag `--context-window N` (integer, default unset) sets or overrides `context_window`. It is applied after the spec has been loaded and after a resumed session has been bound to its endpoint, and before the spec is validated. So it works on top of a spec file and on top of the default in-memory spec for `run://` models, and no spec file is needed. When the flag is absent, the loaded spec's value (or its absence) is kept.
 - System prompt: when enabled, a newly created session appends this block to the system prompt after the environment block, separated from it by a blank line (`<B>` is the budget in decimal digits; `<agent>` is the agent's own fixed product name):
   ```
   <budget:token_budget><B></budget:token_budget>
@@ -39,4 +40,6 @@ The agent puts the true token count into the model's own context, so the model c
 - R = T exactly is not below the threshold.
 - P > B: R is 0 and it counts as below the threshold.
 - A response without a usage block produces nothing and does not advance C.
+- `--context-window 922000` with a spec declaring `context_window` 128000 and no explicit budget: B is 922000.
+- `--context-window` with a value ≤ 0 (for example `0`) makes the process exit with a non-zero status and an error message saying the value must be a positive integer. This happens before any session starts. A value that is not an integer is rejected as a usage error by the argument parser.
 - Disabled: no budget block in the system prompt, no `<system_warning>`, no reminder and no `token_budget_remaining` field.
