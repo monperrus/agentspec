@@ -1,6 +1,6 @@
 # Environment awareness in the system prompt
 
-At session start the agent appends an environment block to the system prompt. It tells the model who the user is, the state of the git repository, where it runs, on which platform, the current time, where to put temporary files and which model and harness it is, and how to attribute the git commits and pull requests it creates.
+At session start the agent appends an environment block to the system prompt. It tells the model who the user is, the state of the git repository, where it runs, on which platform and with how many CPU cores and how much RAM, the current time, where to put temporary files and which model and harness it is, and how to attribute the git commits and pull requests it creates.
 
 ## Behaviour
 - The block is appended last, after the caller supplement, the global instructions file and `AGENTS.md`, separated from the preceding text by a blank line. It is added to every newly created session, in all call-delivery modes.
@@ -10,11 +10,13 @@ At session start the agent appends an environment block to the system prompt. It
   3. The git status block (see below), omitted outside a git work tree.
   4. `Working directory: <absolute current working directory>`
   5. `OS: <system name> <kernel release> (<machine architecture>)`, e.g. `OS: Linux 6.8.0 (x86_64)`.
-  6. `Current date/time: <YYYY-MM-DD HH:MM:SS> (<timezone name> timezone)`, in local time. If the timezone has no name, `local` is used instead.
-  7. `Scratchpad (for temporary files): <path>`: a per-working-directory directory directly under the system temporary directory (see below). The agent creates it (with parents) if it is missing.
-  8. `Model: <model>`, followed by ` (version <version>)` when the spec has a non-empty `version` field.
-  9. `Harness: <harness name> <harness version>`: the agent's own fixed product name followed by its installed release version string (the same version it reports elsewhere). Always present.
-  10. An empty line, then the attribution block (see below). Always present.
+  6. `CPU cores: <n>`: the number of cores the agent's process may run on (its scheduler affinity where the platform exposes it, otherwise the machine's logical core count). Omitted when unknown or zero.
+  7. `RAM: <total> GiB`: total physical memory in GiB (1 GiB = 1024³ bytes), with exactly one decimal, e.g. `RAM: 15.6 GiB`. On Linux it is read from the `MemTotal:` line of `/proc/meminfo` (a value in KiB); otherwise from the operating system's total-memory query (on macOS, the `hw.memsize` sysctl, in bytes). Omitted when unknown or zero.
+  8. `Current date/time: <YYYY-MM-DD HH:MM:SS> (<timezone name> timezone)`, in local time. If the timezone has no name, `local` is used instead.
+  9. `Scratchpad (for temporary files): <path>`: a per-working-directory directory directly under the system temporary directory (see below). The agent creates it (with parents) if it is missing.
+  10. `Model: <model>`, followed by ` (version <version>)` when the spec has a non-empty `version` field.
+  11. `Harness: <harness name> <harness version>`: the agent's own fixed product name followed by its installed release version string (the same version it reports elsewhere). Always present.
+  12. An empty line, then the attribution block (see below). Always present.
 - Attribution block: instructions telling the model how to attribute git commits and pull requests it creates. Exactly these lines, where `<harness name>` is the same fixed product name as on the `Harness:` line, `<model>` is the spec's `model` value verbatim, `<maintainer domain>` is a fixed mail domain and `<project URL>` is the agent's fixed project home page:
   - `## Attribution`
   - `Attribution for git commits and pull requests you create from here on:`
@@ -32,6 +34,7 @@ At session start the agent appends an environment block to the system prompt. It
 
 ## Edge cases
 - Git missing, not a repository, or any git query failing to start or taking more than 5 seconds: the git status block is omitted and the git identity part is left out. The session still starts.
+- CPU or RAM detection failing (unreadable `/proc/meminfo`, no `MemTotal:` line, missing or failing memory query, or a query taking more than 5 seconds): the corresponding line is omitted and the session still starts.
 - A repository with no commits yet: the `last commit` line is omitted.
 - Unset or empty git config values count as absent.
 - The attribution trailer uses the model name unchanged, including dots and hyphens (e.g. model `m-2.6` yields `Co-Authored-By: <harness name>+m-2.6 <<harness name>+m-2.6@<maintainer domain>>`). The spec's `version` field does not appear in it.
