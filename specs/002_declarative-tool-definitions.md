@@ -31,7 +31,7 @@ A library caller can declare a custom tool once (model-facing name, description,
 ## Edge cases
 - An empty list of declarations yields an empty `tools` array and an empty `tool_dispatch` table.
 - If the implementation's parameters cannot be introspected, the inferred schema is `{"type": "object", "properties": {}, "required": []}`.
-- A dispatch entry with no `python_function`, or with a name absent from the registry, returns `ERROR: python_function '<value>' not found in TOOL_LIBRARY` to the model (not fatal); a tool with no dispatch entry at all remains fatal.
+- A dispatch entry with no `python_function`, or with a name absent from the registry, returns `ERROR: python_function '<value>' not found in TOOL_LIBRARY` to the model (not fatal); a tool with no dispatch entry at all is not fatal either and returns the unknown-tool error listing the available tools.
 - Documentation that is empty, missing, or has no `Tool spec:` line yields no tool spec.
 - In a tool-spec block, a missing `name` or `description` yields an empty string, and a missing `parameters` section yields no parameters. A parameter line with no sub-keys yields an empty object for that parameter.
 - The block ends at the first non-blank line indented less than the first non-blank line after `Tool spec:`; blank lines inside the block are ignored.
