@@ -17,6 +17,8 @@ A caller embedding the agent as a library can subscribe handlers to individual e
     - Built-in substring replacement: `removed` = line count of the old text, `added` = line count of the new text, where a non-empty text has (number of newlines + 1) lines and an empty text has 0, each multiplied by the number of occurrences actually replaced (1 by default, all of them with `replace_all`). E.g. replacing `1` by `2` in `x=1\ny=1\nz=1\n` gives `added` 1, `removed` 1 by default, and 3/3 with `replace_all`.
   - `content_delta` / `reasoning_delta` (streamed text or reasoning chunk): `text`, `first`, `no_newline`.
   - `content_stream_end` / `reasoning_stream_end` (end of a streamed sequence): `no_newline`.
+    - Reasoning deltas always precede content deltas within a turn. When a turn streamed both reasoning and content, `reasoning_stream_end` is emitted before `content_stream_end`, so consumers that buffer reasoning until its end event never lose the trace. In that case its `fmt` is empty (the console's `[thinking]` line was already terminated by the first content delta's leading newline), while `content_stream_end` keeps `fmt` = `"\n"`.
+    - When only reasoning streamed (no content), `reasoning_stream_end` is still emitted, and no `content_stream_end` is.
   - `usage` (per-turn token usage) and `session_usage` (cumulative, emitted with the final answer): `prompt`, `completion`, `total`, `cached`, `cache_write`.
   - `error` (API or dispatch error): `text`, `error_class`, `http_status`, `elapsed_s`, `adapter` (see the structured error diagnostics spec).
   - `final_answer` (the agent's final reply): `text`.
