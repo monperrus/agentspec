@@ -58,3 +58,4 @@ In the interactive REPL and the interactive CLI loop, a line that starts with `/
 - The retry action is never invoked for commands other than `/c`, nor when a command fails with an error.
 - `/c` is not one of the commands the `slash_command` tool offers to the model.
 - A line such as `/tmp/file` counts as a slash command (the unknown command `tmp/file`), so it never reaches the model.
+- A bare `/`, or `/` followed only by whitespace, has no command name. It prints `Empty command. Type /help for available commands.`, is consumed like any slash command, does not go to the model, and the loop keeps running. It must never crash the turn.
