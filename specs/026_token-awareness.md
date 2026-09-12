@@ -30,6 +30,7 @@ The agent puts the true token count into the model's own context, so the model c
 - `token_budget` event: emitted whenever a countdown is produced, with `used` (P), `budget` (B), `remaining` (R), `below_reminder_threshold` (R < T) and `fmt`, a dim magenta line `[budget] <R>/<B> tokens remaining`, with thousands separators and ` (below reminder threshold)` appended when below. It is emitted before the response's `usage` event.
 - Usage log: when the feature is enabled, each per-response `usage` log record gains `token_budget_remaining` = max(0, B − P). This happens on every counted call, whatever N is.
 - Snapshot: the message snapshot `metadata` gains `token_awareness`, an object with `enabled` (boolean), `budget_tokens`, `reminder_tokens` and `update_every`.
+- Resume replay: when a transcript is rebuilt for resume (from a message snapshot or from the durable session journal), only the latest countdown is kept. The message that holds the last `<system_warning>Token usage:` reading in the transcript keeps it verbatim, along with any reminder. Every other message loses its countdown: the `<system_warning>Token usage: …</system_warning>` text, the newlines before it, and a `<context_window_reminder>…</context_window_reminder>` block directly after it (separated only by whitespace) are all removed as one block, and trailing whitespace is trimmed from what is left. Stripping happens before consecutive user messages are merged. Messages whose content is not plain text are left alone.
 - In-memory restore: a restored session that predates this feature gets the defaults: enabled, B = its `compaction_trigger_tokens` (or `100000`), T = `6144`, N = `1`, no previous R. Explicit overrides given at restore time replace the stored values. The stored system prompt is not rewritten.
 
 ## Edge cases
@@ -42,4 +43,7 @@ The agent puts the true token count into the model's own context, so the model c
 - A response without a usage block produces nothing and does not advance C.
 - `--context-window 922000` with a spec declaring `context_window` 128000 and no explicit budget: B is 922000.
 - `--context-window` with a value ≤ 0 (for example `0`) makes the process exit with a non-zero status and an error message saying the value must be a positive integer. This happens before any session starts. A value that is not an integer is rejected as a usage error by the argument parser.
+- Resume of a transcript whose tool results read `res1\n\n<system_warning>Token usage: 100/1000; 900 remaining</system_warning>` and later `res2\n\n<system_warning>Token usage: 200/1000; 800 remaining</system_warning>`: the first becomes exactly `res1`, the second is unchanged, and `Token usage` appears only once in the replayed transcript.
+- Resume where the stale reading carries the checkpoint reminder (`res\n\n<system_warning>…</system_warning>\n<context_window_reminder>\n…\n</context_window_reminder>`): the content becomes exactly `res`.
+- Resume of a transcript with no countdown at all: no message changes.
 - Disabled: no budget block in the system prompt, no `<system_warning>`, no reminder and no `token_budget_remaining` field.
