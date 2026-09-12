@@ -80,7 +80,7 @@ The agent is a coding agent that works with any OpenAI-compatible chat-completio
 
 ### Events
 - The agent reports progress as typed events, each carrying a pre-formatted display string: `tool_call`, `tool_result`, `usage`, `token_limit`, `final_answer`, `session_usage`, `session_resumed`, `session_restored`, `provider_pinned`, `content_delta`, `reasoning_delta`, `content_stream_end`, `reasoning_stream_end`, `error` (displayed as `Error: <text>`). A caller can supply its own event handler. By default, the display string is printed (`token_limit` to stderr, and streaming deltas without a newline).
-- A displayed tool result shows at most 20 lines, followed by a count of the remaining lines. Displayed tool-call arguments are cut at 200 characters.
+- A displayed tool result shows at most its first 40 lines, each indented by two spaces. When the result has more than 40 lines, one more line `  … (<n − 40> more lines)` follows, where `<n>` is the total line count. A result with exactly 40 lines or fewer has no such line. Displayed tool-call arguments are cut at 200 characters.
 
 ### Logging and resume
 - Each session appends JSON Lines records to `~/.local/share/agent_probe/<safe model>/<YYYY-MM-DD>/<HHMMSS>_<session id>.jsonl`. Record types: `session_start`, `session_resumed`, `session_restored`, `user`, `usage`, `tool_call`, `tool_result`, `fatal_error`, `error`, `provider_pinned`, `assistant`, `session_end`. Every record has `ts` (ISO seconds) and `cwd`. A `tool_result` record has the tool `name`, the name of the implementation that handled it, and `result`, the full result text returned to the model.
