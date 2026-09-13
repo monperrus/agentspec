@@ -22,7 +22,7 @@ The implementation registry offers two more built-in implementations that let a 
   - While a delayed execution has not started yet, it instead returns `{"completed": false, "scheduled": true, "starts_in_seconds" (remaining delay, 3 decimals, never below 0), "started_at" (the planned start time), "cwd", "command", "stdout_localfile", "stderr_localfile"}`.
 - Each implementation returns its text result together with metadata `{"result": <same text>}`.
 - When a `read_file` tool call's `path`, after expanding a leading `~` to the home directory, is exactly the stdout or stderr capture file path of a command started in the current process, the displayed tool result is prefixed with a yellow line `  shell output from: <command>` (the label bold), followed by the usual dimmed result display. The result sent to the model and written to the session log is unchanged.
-- There is no longer a standalone ready-made asynchronous coding agent; the grace-period coding agent is the ready-made agent that offers these implementations to the model.
+- There is no ready-made coding agent that offers these implementations to the model; an agent spec opts in by naming them in `tool_dispatch`. The former standalone asynchronous coding agent and the grace-period coding agent (which waited 2 seconds before each shell command so the operator could abort it) no longer exist.
 
 ## Edge cases
 - When no session id is available (the start implementation is called outside a session's tool dispatch, or the session has no id), files go directly into `~/.cache/async_agent_execs/` with no subdirectory.
