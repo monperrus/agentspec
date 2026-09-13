@@ -1,6 +1,6 @@
 # Slash commands
 
-In the interactive REPL and the interactive CLI loop, a line that starts with `/` is a slash command. The agent handles it locally and never sends it to the model. The built-in commands are `/c`, `/clear`, `/compact`, `/model`, `/usage`, `/hooks` and `/help`. A caller can register more commands or remove existing ones. Each command has a name and a one-line description.
+In the interactive REPL and the interactive CLI loop, a line that starts with `/` is a slash command. The agent handles it locally and never sends it to the model. The built-in commands are `/c`, `/clear`, `/compact`, `/model`, `/usage`, `/hooks`, `/tool` (see runtime tool management) and `/help`. A caller can register more commands or remove existing ones. Each command has a name and a one-line description.
 
 ## Behaviour
 - Before a non-empty input line is treated as a task, the agent checks the exit words (`exit`, `quit`, `q`) first, then slash commands.
@@ -15,6 +15,7 @@ In the interactive REPL and the interactive CLI loop, a line that starts with `/
   - `model`: "List available models or switch: /model <model-id>."
   - `usage`: "Show token usage for the current session."
   - `hooks`: "List configured lifecycle hooks and their sources."
+  - `tool`: "List / activate / remove tools at runtime: /tool list | /tool activate <name> | /tool remove <name>."
   - `help`: "Show this help message."
 - `/c` (continue) prints nothing. Right after it, the REPL runs a new turn on the conversation as it stands, without adding a user message. The request re-sends the existing transcript unchanged. No user message is merged or appended, and no `user` log record is written. The session journal's `turn_start` record has a `null` task. This turn replaces the usual snapshot save after a slash command. The turn itself saves the snapshot as any turn does, and it gets the same interruption, error and event handling.
   - Example: the user sends `work`, the turn is interrupted, then the user enters `/c`. The retry request's only user message is `work`.
@@ -47,8 +48,8 @@ In the interactive REPL and the interactive CLI loop, a line that starts with `/
 
 ## Model-callable slash command tool
 - The built-in commands can also be offered to the model as one ready-made tool named `slash_command`. An agent opts in by adding it to its tool list, and it is dispatched like any other tool.
-- Tool description given to the model: `Run a slash command. command: one of clear, compact, model, usage, hooks, help. For 'model', pass a model-id in args to switch; omit args to list.`
-- Parameters: `command` (required string, enum `clear`, `compact`, `model`, `usage`, `hooks`, `help`, description `Slash command to run.`) and `args` (optional string, default empty, description `Optional argument (e.g. model-id for 'model').`).
+- Tool description given to the model: `Run a slash command. command: one of clear, compact, model, usage, hooks, tool, help. For 'model', pass a model-id in args to switch; omit args to list. For 'tool', args is one of: 'list', 'activate <tool_name>', 'remove <tool_name>'.`
+- Parameters: `command` (required string, enum `clear`, `compact`, `model`, `usage`, `hooks`, `tool`, `help`, description `Slash command to run.`) and `args` (optional string, default empty, description `Optional argument (e.g. model-id for 'model', 'activate read_file' for 'tool').`).
 - Before the tool is used, the agent binds it to the live session, the model client and the current model name. It usually does this right after creating the session.
 - A call runs the same built-in behaviour as the matching REPL command, with `args` as the argument string, on the bound session. For example, `clear` resets the bound session's history and usage totals, and `model` with an id switches the bound session's model.
 - The tool result is the text the command would have printed, with leading and trailing whitespace removed. It is not printed to the console. The structured result carries the same text in a `result` field.
@@ -59,7 +60,7 @@ In the interactive REPL and the interactive CLI loop, a line that starts with `/
 - If fetching the model list fails, `/model` prints `Failed to fetch models from endpoint: <message>` and then `The endpoint may not support GET /models.` If the list is empty, it prints `No models returned by the endpoint.`
 - `/model <id>` does not check whether the model exists and does not reload the agent spec. The session keeps its tool schema and dispatch table.
 - The cached percentage is 0 when there are no prompt tokens.
-- If the tool gets a `command` outside the six built-ins, it runs nothing and returns `ERROR: unknown command '<command>'. Valid: clear, compact, model, usage, hooks, help`. Commands registered by a caller are not reachable through the tool.
+- If the tool gets a `command` outside the seven built-ins, it runs nothing and returns `ERROR: unknown command '<command>'. Valid: clear, compact, model, usage, hooks, tool, help`. Commands registered by a caller are not reachable through the tool.
 - `/c` ignores its argument string. It does not check whether the last turn was actually interrupted: it always re-sends the current transcript as is, even when that transcript ends with an assistant message.
 - The retry action is never invoked for commands other than `/c`, nor when a command fails with an error.
 - `/c` is not one of the commands the `slash_command` tool offers to the model.
