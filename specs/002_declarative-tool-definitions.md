@@ -26,9 +26,12 @@ A library caller can declare a custom tool once (model-facing name, description,
   Parsing a block yields `name`, `description` and `parameters` (parameter name → an object with the `type` and/or `description` given under it), with parameters in block order. Values are the text after `key:`, trimmed. Unknown keys are ignored.
 - A caller can scan a collection of implementations and obtain, for every implementation whose documentation contains a tool-spec block, a mapping from the implementation name to its parsed block. Implementations without a block are omitted.
 - The built-in read, write, string-replace and shell implementations carry tool-spec blocks whose name, parameter names and parameter types match their entries in the default tool set.
+- A caller can obtain the built-in tool set (`read_file`, `write_file`, `str_replace`, `exec_shell`) as the same schema-array / dispatch-table pair, identical in shape to the result of converting declarations. Its implementations are already registered, so the pair can be passed to dispatch as is (e.g. writing then reading a file through it works) — useful for a host that only embeds the tool runtime, such as a server re-publishing the tools under another protocol.
+- Each request for the built-in pair returns fresh, fully independent copies of both halves: a caller may mutate or extend them (clear the schema array, edit a `param_map`, add tools) without affecting later requests or the agent's own default tool set.
 - A `tool_dispatch` entry's `python_function` may be either an implementation name, looked up in the implementation registry, or (for library callers building the table in memory) the implementation itself, which is called directly. `param_map` translation applies identically in both cases.
 
 ## Edge cases
+- In the built-in pair, the schema entries list exactly the four built-in tool names (first entry `read_file`), each with `"type": "function"` and an object-typed `parameters`; `read_file`'s `param_map` is empty.
 - An empty list of declarations yields an empty `tools` array and an empty `tool_dispatch` table.
 - If the implementation's parameters cannot be introspected, the inferred schema is `{"type": "object", "properties": {}, "required": []}`.
 - A dispatch entry with no `python_function`, or with a name absent from the registry, returns `ERROR: python_function '<value>' not found in TOOL_LIBRARY` to the model (not fatal); a tool with no dispatch entry at all is not fatal either and returns the unknown-tool error listing the available tools.
