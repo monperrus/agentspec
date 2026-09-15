@@ -22,10 +22,17 @@ A library caller can declare a custom tool once (model-facing name, description,
           path:
               type: string
               description: Path to the file.
+              required: true
   ```
-  Parsing a block yields `name`, `description` and `parameters` (parameter name → an object with the `type` and/or `description` given under it), with parameters in block order. Values are the text after `key:`, trimmed. Unknown keys are ignored.
-- A caller can scan a collection of implementations and obtain, for every implementation whose documentation contains a tool-spec block, a mapping from the implementation name to its parsed block. Implementations without a block are omitted.
-- The built-in read, write, string-replace and shell implementations carry tool-spec blocks whose name, parameter names and parameter types match their entries in the default tool set.
+  Parsing a block yields `name`, `description`, `parameters` (parameter name → an object with the `type` and/or `description` given under it), with parameters in block order, and `required` (the names of parameters marked `required: true`, in declaration order, without duplicates). Values are the text after `key:`, trimmed. `required` is true when its value is `true`, `yes` or `1` (case-insensitive); any other value leaves the parameter optional. Unknown keys are ignored.
+- A caller can convert a parsed tool-spec block into one OpenAI-compatible schema entry: `{"type": "function", "function": {"name": <name>, "description": <description>, "parameters": {"type": "object", "properties": <parameters>, "required": <required>}}}`. The `required` marker never appears inside a property; properties keep only their `type` and `description`.
+- A caller can scan a collection of implementations and obtain, for every implementation whose documentation contains a tool-spec block, a mapping from the implementation name to its parsed block. Implementations without a block are omitted. Combined with the conversion above, this lets a host publish a schema for a set of documented tools without re-describing their parameters.
+- The built-in read, write, string-replace and shell implementations carry tool-spec blocks whose conversion reproduces their entries in the default tool set: same parameter names, types and `required` lists (`read_file`: `path`; `write_file`: `path`, `content`; `str_replace`: `path`, `old_str`, `new_str`; `exec_shell`: `command`). For `read_file` the conversion is identical to the default entry. Descriptions may differ in wording but are never empty.
+- The extra library tools also carry blocks:
+  - `glob`: returns the paths matching a glob pattern, one per line; parameter `pattern` (string, required).
+  - `list_dir`: lists a directory's entries, one per line, prefixed by `d` (directory) or `f` (file); parameter `path` (string, required).
+  - `search_files`: searches file contents for a regular expression and returns the matching lines as JSON; parameters `pattern` (string, required) and `path` (string, optional, default `.`).
+- Every parameter an implementation needs without a default is marked required in its block.
 - A caller can obtain the built-in tool set (`read_file`, `write_file`, `str_replace`, `exec_shell`) as the same schema-array / dispatch-table pair, identical in shape to the result of converting declarations. Its implementations are already registered, so the pair can be passed to dispatch as is (e.g. writing then reading a file through it works) — useful for a host that only embeds the tool runtime, such as a server re-publishing the tools under another protocol.
 - Each request for the built-in pair returns fresh, fully independent copies of both halves: a caller may mutate or extend them (clear the schema array, edit a `param_map`, add tools) without affecting later requests or the agent's own default tool set.
 - A `tool_dispatch` entry's `python_function` may be either an implementation name, looked up in the implementation registry, or (for library callers building the table in memory) the implementation itself, which is called directly. `param_map` translation applies identically in both cases.
@@ -36,6 +43,6 @@ A library caller can declare a custom tool once (model-facing name, description,
 - If the implementation's parameters cannot be introspected, the inferred schema is `{"type": "object", "properties": {}, "required": []}`.
 - A dispatch entry with no `python_function`, or with a name absent from the registry, returns `ERROR: python_function '<value>' not found in TOOL_LIBRARY` to the model (not fatal); a tool with no dispatch entry at all is not fatal either and returns the unknown-tool error listing the available tools.
 - Documentation that is empty, missing, or has no `Tool spec:` line yields no tool spec.
-- In a tool-spec block, a missing `name` or `description` yields an empty string, and a missing `parameters` section yields no parameters. A parameter line with no sub-keys yields an empty object for that parameter.
+- In a tool-spec block, a missing `name` or `description` yields an empty string, and a missing `parameters` section yields no parameters, and a block with no `required: true` marker yields an empty `required` list (converted to `"required": []`). A parameter line with no sub-keys yields an empty object for that parameter.
 - The block ends at the first non-blank line indented less than the first non-blank line after `Tool spec:`; blank lines inside the block are ignored.
 - Two declarations with the same model-facing name: the later one's dispatch entry wins, while both schema entries are emitted.
