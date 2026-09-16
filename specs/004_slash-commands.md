@@ -56,7 +56,7 @@ In the interactive REPL and the interactive CLI loop, a line that starts with `/
 
 ## Edge cases
 - If no endpoint can be determined, `/model` prints `Cannot determine endpoint URL to query /models.`
-- For a `run://` subprocess backend, `/model` with no argument prints `/models is not available for subprocess backends.` and sends no request.
+- For a `run://` subprocess backend, `/model` with no argument sends no request. Instead it prints `Subprocess backend: <binary>` and then `The request payload is piped to its stdin as JSON.` `<binary>` is the executable the backend actually runs (as resolved by the backend, falling back to the path parsed from the `run://` URI), quoted with POSIX shell quoting (e.g. a path containing spaces is wrapped in single quotes).
 - If fetching the model list fails, `/model` prints `Failed to fetch models from endpoint: <message>` and then `The endpoint may not support GET /models.` If the list is empty, it prints `No models returned by the endpoint.`
 - `/model <id>` does not check whether the model exists and does not reload the agent spec. The session keeps its tool schema and dispatch table.
 - The cached percentage is 0 when there are no prompt tokens.
