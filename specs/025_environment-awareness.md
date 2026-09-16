@@ -27,7 +27,7 @@ At session start the agent appends an environment block to the system prompt. It
 - Identity: `unix user: <login name>` when the login name can be determined. Then, when git `user.name` or `user.email` is configured (as seen from the working directory), `git identity: <name> <<email>>`, with the absent part left out (`git identity: <name>` or `git identity: <<email>>`). The two parts are joined by `; `. If only the git part exists, it appears alone.
 - Git status block, when the working directory is inside a git work tree:
   - `Git: on branch <current branch>`, or `(unknown)` in place of the branch when it cannot be determined. A detached HEAD shows as `HEAD`.
-  - `  last commit: <subject of the latest commit>` when there is one.
+  - When the current branch has commits: `  recent commits:`, then up to the five most recent commits reachable from HEAD, newest first, one per line as `    <abbreviated hash> <subject>` (four-space indent, git's default short hash). Blank lines are skipped.
   - If the working tree has changes: `  changed files (<n>):`, then up to the first 20 short-format (porcelain) status lines, each indented by four spaces. If there are more than 20, one more line `    … (<n − 20> more)` follows.
   - Otherwise: `  working tree clean`.
 - Scratchpad directory name: `<fixed agent-specific prefix>-<basename of the working directory>-<hash>`, where `<hash>` is the first 8 lowercase hex characters of the SHA-1 digest of the absolute working-directory path (as a UTF-8 string).
@@ -35,7 +35,8 @@ At session start the agent appends an environment block to the system prompt. It
 ## Edge cases
 - Git missing, not a repository, or any git query failing to start or taking more than 5 seconds: the git status block is omitted and the git identity part is left out. The session still starts.
 - CPU or RAM detection failing (unreadable `/proc/meminfo`, no `MemTotal:` line, missing or failing memory query, or a query taking more than 5 seconds): the corresponding line is omitted and the session still starts.
-- A repository with no commits yet: the `last commit` line is omitted.
+- A repository with no commits yet: the `recent commits:` header and its lines are omitted.
+- Fewer than five commits: all of them are listed. More than five: only the five newest appear (with seven commits, the two oldest are absent).
 - Unset or empty git config values count as absent.
 - The attribution trailer uses the model name unchanged, including dots and hyphens (e.g. model `m-2.6` yields `Co-Authored-By: <harness name>+m-2.6 <<harness name>+m-2.6@<maintainer domain>>`). The spec's `version` field does not appear in it.
 - Two working directories with the same basename but different paths get different scratchpads. Sessions started in the same working directory always get the same scratchpad, so it is stable across sessions of one project.
