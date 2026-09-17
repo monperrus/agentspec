@@ -23,6 +23,7 @@ The agent runs user-configured hooks at fixed points in the session lifecycle. I
 - A leading `~` in a path is expanded. A missing file or directory is silently skipped. An unreadable file, invalid JSON, a non-object config, an unknown event, or a malformed matcher group or handler prints a warning `⚠ hooks: <message>` to stderr at startup and skips only the bad part. It is never fatal.
 - After all sources are merged, duplicates are removed. Two command hooks are one hook when they have the same event, the same matcher, and commands that resolve to the same file (after `~` expansion and resolution to an absolute, symlink-free path). The first occurrence, from the earlier layer, is kept. A command containing any of the characters `` ;|&<>$`*?(){}[] `` or a newline is a shell one-liner and is never deduplicated. In-process function hooks are never deduplicated.
 - A master switch turns off every hook, whatever its source: the top-level spec key `hooks_enabled` (default `true`), a programmatic override (which wins over the spec), and the CLI flag `--no-hooks`.
+- The `hooks` option and the `hooks_enabled` override are accepted in every launch mode: a one-shot task, a programmatic session, and both interactive REPL variants (the plain one and the one with type-ahead input). The CLI forwards `--hooks` and `--no-hooks` to whichever mode it starts.
 - A programmatic caller can register a hook on a live session, giving an event, an optional matcher, an optional timeout, an async flag, and either a function or a command (with optional exec-form args). It can also merge a further config source into a live session, and gets back the added entries and the warnings. Registering an unknown event, or giving neither a function nor a command, is an error.
 - When a session is restored in memory, it keeps its hooks. A `hooks` option given at restore time is merged in, and a `hooks_enabled` override replaces the stored value (default enabled).
 
@@ -126,6 +127,7 @@ The same rules apply to every hook:
 - `Interrupt` fires when Ctrl-C interrupts a running turn, before the running subprocess is killed. It is advisory and cannot prevent the interrupt.
 
 ## Edge cases
+- Starting the interactive REPL, with or without `--hooks`/`--no-hooks`, never fails because of the hook options. The given hooks apply to the REPL session, and `--no-hooks` disables them there.
 - Hooks disabled, or no hooks configured: no hook runs, no hook event is emitted, and the behaviour is exactly as without this feature.
 - A matcher `Bash` matches a call to `exec_shell`. A matcher `exec_shell` matches it too.
 - A matcher `mcp__.*` is a regex. `Edit|Write` matches either name exactly, and `Edi` matches neither.
