@@ -15,14 +15,33 @@ The agent runs user-configured hooks at fixed points in the session lifecycle. I
   - A field with an invalid value is ignored.
 - Handler types `mcp_tool`, `prompt` and `agent` are parsed but skipped with a warning. Any other non-`command` type, or a missing or empty `command`, is skipped with a warning.
 - Sources merge additively, in this order:
-  1. the programmatic `hooks` option of a session or one-shot task (a file path, an inline config, or a list of either), which the CLI fills from `--hooks PATH` (repeatable);
+  1. the programmatic `hooks` option of a session or one-shot task (a file path, a directory path, an inline config, or a list of any of these), which the CLI fills from `--hooks PATH` (repeatable);
   2. the agent spec's `behaviour.hooks` (same accepted forms);
-  3. the project file `hooks.json` inside the agent's per-project config directory at the root of the enclosing git work tree (or the current directory when outside a git repository);
-  4. the user file `hooks.json` inside the agent's per-user config directory in the home directory.
-- A leading `~` in a file path is expanded. A missing file is silently skipped. An unreadable file, invalid JSON, a non-object config, an unknown event, or a malformed matcher group or handler prints a warning `⚠ hooks: <message>` to stderr at startup and skips only the bad part. It is never fatal.
+  3. the project layer, inside the agent's per-project config directory at the root of the enclosing git work tree (or the current directory when outside a git repository): first its `hooks.json` file, then its `hooks/` directory;
+  4. the user layer, inside the agent's per-user config directory in the home directory: first its `hooks.json` file, then its `hooks/` directory.
+- A path source that is a directory is scanned as a hooks directory (see below). Any other path is parsed as a `hooks.json`-shaped file.
+- A leading `~` in a path is expanded. A missing file or directory is silently skipped. An unreadable file, invalid JSON, a non-object config, an unknown event, or a malformed matcher group or handler prints a warning `⚠ hooks: <message>` to stderr at startup and skips only the bad part. It is never fatal.
+- After all sources are merged, duplicates are removed. Two command hooks are one hook when they have the same event, the same matcher, and commands that resolve to the same file (after `~` expansion and resolution to an absolute, symlink-free path). The first occurrence, from the earlier layer, is kept. A command containing any of the characters `` ;|&<>$`*?(){}[] `` or a newline is a shell one-liner and is never deduplicated. In-process function hooks are never deduplicated.
 - A master switch turns off every hook, whatever its source: the top-level spec key `hooks_enabled` (default `true`), a programmatic override (which wins over the spec), and the CLI flag `--no-hooks`.
 - A programmatic caller can register a hook on a live session, giving an event, an optional matcher, an optional timeout, an async flag, and either a function or a command (with optional exec-form args). It can also merge a further config source into a live session, and gets back the added entries and the warnings. Registering an unknown event, or giving neither a function nor a command, is an error.
 - When a session is restored in memory, it keeps its hooks. A `hooks` option given at restore time is merged in, and a `hooks_enabled` override replaces the stored value (default enabled).
+
+### Hooks directory
+- In a hooks directory, the presence of an executable file is its registration. No JSON is needed.
+- Accepted layout:
+  - `<dir>/<script>`: the event is inferred from the file name, and the matcher is empty.
+  - `<dir>/<event>/<script>`: the directory names the event, and the matcher is empty.
+  - `<dir>/<event>/<matcher>/<script>`: the second directory's name is the matcher, taken verbatim.
+- An event is inferred from a name as follows. The name is normalized: lowercased, with every character other than a letter or digit removed. For a file, the name is taken without its last extension. An exact match against a normalized known event name (including the events that never fire) wins. Otherwise, the longest known event name that the normalized name ends with is used. So `pre-compact.sh` → `PreCompact`, `notify-stop.py` → `Stop`, and `notify-subagent-stop.py` → `SubagentStop`.
+- A discovered script runs in exec form with no arguments: its path is spawned directly, never through a shell. It follows the usual input and output contract.
+- These entries are ignored silently, at any level: names starting with `.`, names ending in `.disabled`, and the names `__pycache__`, `readme`, `readme.md` and `notes` (case-insensitive).
+- These entries produce a startup warning and are not registered:
+  - a file at the top level whose event cannot be inferred;
+  - a top-level directory that is not an event name;
+  - a directory below `<event>/<matcher>/` (nested too deep);
+  - a file that is not executable by the current user.
+- Entries are discovered in sorted name order, so the result is deterministic.
+- A programmatic caller can scan a directory on its own and get back the discovered entries and the warnings.
 
 ### Events
 - Events that fire: `SessionStart`, `SessionEnd`, `UserPromptSubmit`, `PreToolUse`, `PostToolUse`, `Stop`, `PreCompact`, `PostCompact`, `Interrupt`.
@@ -116,3 +135,7 @@ The same rules apply to every hook:
 - `updatedInput` sent with `permissionDecision: "deny"` or with no permission decision: the output is invalid, and a non-blocking error is reported.
 - A `Stop` hook that blocks every time makes the turn continue exactly once. The second final reply ends the turn.
 - A settings file configuring only never-firing events loads without warnings, and its hooks never run.
+- `hooks/helpers.sh` (no event in the name) or a non-executable `hooks/Stop/notify.py`: a startup warning, and nothing is registered. Such a file never fails at dispatch time with exit 127.
+- `hooks/Stop/my hook.sh`: the path with a space runs correctly, since no shell is involved.
+- A `hooks.json` entry whose command is `<layer>/hooks/./notify-stop.py`, plus the discovered `<layer>/hooks/notify-stop.py`: the script runs once per `Stop`.
+- The same script registered on `PreToolUse`/`Bash`, `PreToolUse`/`Edit` and `Stop`: three distinct hooks. The same shell one-liner listed twice: it runs twice.
