@@ -39,7 +39,7 @@ By default the agent checks prompt caching strictly. The first model call of a s
 - A write-only response emits `cache_written` regardless of prompt size relative to the floor, and never `cache_below_minimum`.
 - A response with both cached tokens > 0 and cache-write tokens > 0 passes silently; no `cache_written` event is emitted.
 - With strict mode off, no cache check is made, missing usage blocks are tolerated, no `cache_cold` or `cache_proof_missing` event is emitted and the status is not updated.
-- With strict mode off, `reports_prompt_tokens: false` has no effect: the strict-mode opt-out takes precedence, no `cache_unmeasurable` event is emitted and the status stays `ok`.
+- With strict mode off, `reports_prompt_tokens: false` has no effect on cache checks: the strict-mode opt-out takes precedence, no `cache_unmeasurable` event is emitted and the status stays `ok`. (The field still changes how the per-response usage line shows the prompt; see the context compaction spec.)
 - With `reports_prompt_tokens` absent or `true`, a first counted call with no cache-proof field still aborts as usual.
 - `cache_unmeasurable` is one-shot per session, unlike `cache_proof_missing` and `cache_cold`.
 - An age of exactly 3600 seconds or less is warm: misses get the `cache_proof_missing` warning.

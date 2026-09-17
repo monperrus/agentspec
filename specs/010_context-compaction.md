@@ -67,10 +67,13 @@ Long sessions compact automatically. When a model call reports that its prompt r
   A successful model response resets the consecutive rejection count to 0.
 - Summary-call overflow: when the phase-2 summary call itself fails with a context-window rejection, the attempt is not reported as a `Compaction failed` error. Compaction retries with a smaller K. K is halved, rounded down; a K of 1 becomes 0. Before each retry the agent emits a `compaction_retry` event with `keep` (the new K). Each retry repeats the whole attempt (split, snapping, both phases). When the summary call is rejected with K already at 0, compaction gives up and reports "not compacted". The session's configured `compaction_keep_last_turns` does not change.
 - Compaction progress: the display line of each per-response `usage` event (`[tokens] …`) includes `compact <p>%`, where p = prompt tokens ÷ the session's `compaction_trigger_tokens` × 100, rounded to a whole number. The parts are separated by `  |  `, and this part sits after the optional cache-write part and before `completion <n>`. It is shown whether or not compaction is enabled. The event's data fields do not change.
+- Unreported prompt size: when the agent spec sets `reports_prompt_tokens: false`, the backend's prompt count is unknown rather than zero. The display line of each per-response `usage` event then starts with `prompt ?` instead of `prompt <n>`. The `(<c> cached, <p>%)` suffix and the `compact <p>%` part are both left out. The cache-write, `completion <n>` and `total <n>` parts are unchanged, and so are the event's data fields. This applies whether or not strict cache mode is on.
 
 ## Edge cases
 - Compaction disabled → no summary call, whatever the token count.
 - `compaction_trigger_tokens` of 0 → the `compact <p>%` part is omitted from the usage line.
+- With `reports_prompt_tokens` absent or `true`, a reported prompt count of 0 still renders as `prompt 0`, and `compact 0%` when the trigger is nonzero.
+- With `reports_prompt_tokens: false` and a 10000-token trigger, a response with 42 completion tokens renders as `prompt ?  |  completion 42  |  total 42`, with no `compact` part.
 - Progress can exceed 100%, for example `compact 104%` on the call that triggers compaction.
 - Prompt tokens exactly equal to the threshold trigger compaction (when W + H is below the threshold, as it is at the start). One token below does not.
 - With the default threshold of 100000: after a compaction triggered at 100000, later calls reporting 100000 or 100001 do not compact. Only a call reporting more than 125000 compacts again.
