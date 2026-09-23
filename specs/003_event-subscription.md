@@ -28,6 +28,7 @@ A caller embedding the agent as a library can subscribe handlers to individual e
   - `session_restored` (a previously returned session object restored in memory): `session_id`.
   - `provider_pinned` (OpenRouter provider locked for the session): `provider`.
   - `compaction` (older context replaced by a summary): `summary`, `compacted_turns`.
+  - `step_reduced` (a step reducer replaced a tool step in the history): `raw_messages`, `kept_messages`, `raw_chars`, `kept_chars`, `final_reply` (see the per-step context policy spec).
   - `cache_cold` (a strict-cache check was waived because the prefix cache expired on a cold resume): `age` (whole seconds since the last timestamped message).
   - `cache_unmeasurable` (in strict cache mode, the agent spec declares `reports_prompt_tokens: false`, so cache proof stands down; emitted once per session): no data fields beyond `fmt`.
   - `cache_proof_missing` (in strict cache mode, a call after the first showed no cache proof or no cache hit; the turn continues): `cached_tokens` and `prompt_tokens` when a usage block was present.
